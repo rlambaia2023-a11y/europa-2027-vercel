@@ -12,9 +12,13 @@ export class ErroHttp extends Error {
 }
 
 // Cliente do Supabase agindo como quem chamou: as regras (RLS) do banco valem aqui também.
+// Sem login (uso em família), age como visitante, que o banco trata como organizador.
 export async function usuarioDaRequisicao(req, { editor = false } = {}) {
   const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!token) throw new ErroHttp(401, "Faça login para continuar.");
+  if (!token) {
+    const db = createClient(URL_SUPABASE, CHAVE_SUPABASE, { auth: { persistSession: false, autoRefreshToken: false } });
+    return { db, user: null, papel: "organizador" };
+  }
   const db = createClient(URL_SUPABASE, CHAVE_SUPABASE, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },

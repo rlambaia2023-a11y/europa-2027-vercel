@@ -3,7 +3,7 @@ import { Toaster as HotToaster } from "react-hot-toast"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -20,10 +20,6 @@ const Album = lazy(() => import('@/pages/Album'));
 const Mapa = lazy(() => import('@/pages/Mapa'));
 const Clima = lazy(() => import('@/pages/Clima'));
 const Admin = lazy(() => import('@/pages/Admin'));
-const Login = lazy(() => import('@/pages/Login'));
-const Register = lazy(() => import('@/pages/Register'));
-const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
 const Sugestoes = lazy(() => import('@/pages/Sugestoes'));
 const Bagagem = lazy(() => import('@/pages/Bagagem'));
 // Add page imports here
@@ -59,10 +55,10 @@ const AuthenticatedApp = () => {
   return (
     <Suspense fallback={<Carregando />}>
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      {/* uso em família, sem login: as telas de conta levam direto ao início */}
+      {['/login', '/register', '/forgot-password', '/reset-password'].map((p) => (
+        <Route key={p} path={p} element={<Navigate to="/" replace />} />
+      ))}
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/itinerario" element={<Itinerario />} />

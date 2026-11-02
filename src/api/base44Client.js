@@ -100,9 +100,12 @@ function entidade(nome) {
 
 const PUBLICAS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
+// Uso em família: sem login, quem abre o app tem acesso completo (as regras do banco também).
+const FAMILIA = { id: null, email: null, full_name: "Família", role: "admin", papel: "organizador" };
+
 async function perfilAtual() {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw erro(new Error("Faça login para continuar."), 401);
+  if (!session) return FAMILIA;
   const { data: perfil, error } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
   if (error) throw erro(error, 401);
   return {
@@ -170,8 +173,7 @@ function nomeArquivo(file) {
 
 async function enviar(bucket, file) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw erro(new Error("Faça login para enviar arquivos."), 401);
-  const caminho = `${session.user.id}/${nomeArquivo(file)}`;
+  const caminho = `${session?.user.id || "familia"}/${nomeArquivo(file)}`;
   const { error } = await supabase.storage.from(bucket).upload(caminho, file, { contentType: file.type || undefined });
   if (error) throw erro(error, 400);
   return caminho;

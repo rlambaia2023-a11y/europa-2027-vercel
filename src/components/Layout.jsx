@@ -4,14 +4,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Compass, CalendarDays, Map, BedDouble, Wallet,
   FileCheck, CloudSun, BookOpen, Settings, Menu, X, Plane, Sparkles,
-  Camera, Luggage, LogOut,
+  Camera, Luggage,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OfflineBanner from "@/components/OfflineBanner";
 import { usePermissao } from "@/lib/usePermissao";
-import { useAuth } from "@/lib/AuthContext";
-
-const NOME_PAPEL = { organizador: "Organizador", editor: "Editor", leitor: "Leitor" };
 
 const NAV = [
   { to: "/", label: "Início", icon: Compass, end: true },
@@ -33,8 +30,7 @@ const NAV_MOBILE = NAV.slice(0, 4);
 export default function Layout() {
   const [maisAberto, setMaisAberto] = useState(false);
   const location = useLocation();
-  const { papel, organizador } = usePermissao();
-  const { logout } = useAuth();
+  const { organizador } = usePermissao();
   const nav = NAV.filter((item) => !item.soOrganizador || organizador);
 
   useEffect(() => { setMaisAberto(false); }, [location.pathname]);
@@ -73,10 +69,7 @@ export default function Layout() {
         <div className="px-6 py-4 border-t border-border">
           <p className="text-[11px] text-muted-foreground">24 mar – 5 abr 2027</p>
           <p className="text-[11px] text-muted-foreground">4 viajantes · 4 países</p>
-          <p className="text-[11px] text-muted-foreground mt-1.5">Você é <strong className="text-foreground">{NOME_PAPEL[papel]}</strong></p>
-          <button onClick={() => logout()} className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-destructive">
-            <LogOut className="w-3.5 h-3.5" /> Sair
-          </button>
+
         </div>
       </aside>
 
@@ -133,12 +126,6 @@ export default function Layout() {
                   </NavLink>
                 ))}
               </nav>
-              <div className="px-5 py-4 border-t border-border flex items-center justify-between">
-                <p className="text-[11px] text-muted-foreground">Você é <strong className="text-foreground">{NOME_PAPEL[papel]}</strong></p>
-                <button onClick={() => logout()} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive">
-                  <LogOut className="w-4 h-4" /> Sair
-                </button>
-              </div>
             </motion.aside>
           </>
         )}
