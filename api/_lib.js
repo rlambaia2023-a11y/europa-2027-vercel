@@ -103,18 +103,25 @@ async function linkAbre(url) {
   }
 }
 
+// A página indicada abre? Se não, vale a página inicial do mesmo site oficial.
+async function linkConferido(url) {
+  if (!url) return "";
+  if (await linkAbre(url)) return url;
+  try {
+    const raiz = new URL(url).origin + "/";
+    if (raiz !== url && (await linkAbre(raiz))) return raiz;
+  } catch { /* URL inválida */ }
+  return "";
+}
+
 // Confere os links oficiais (em lotes) e garante sempre um caminho para comprar.
 export async function comLinksOficiais(itens, local) {
   const saida = [];
   for (let i = 0; i < itens.length; i += 8) {
     const lote = itens.slice(i, i + 8);
-    const ok = await Promise.all(lote.map((it) => (it?.link_oficial ? linkAbre(String(it.link_oficial).trim()) : false)));
+    const conferidos = await Promise.all(lote.map((it) => linkConferido(String(it?.link_oficial || "").trim())));
     lote.forEach((it, j) => {
-      saida.push({
-        ...it,
-        link_oficial: ok[j] ? String(it.link_oficial).trim() : "",
-        link_busca: linkBusca(it?.nome, it?.cidade || local),
-      });
+      saida.push({ ...it, link_oficial: conferidos[j], link_busca: linkBusca(it?.nome, it?.cidade || local) });
     });
   }
   return saida;

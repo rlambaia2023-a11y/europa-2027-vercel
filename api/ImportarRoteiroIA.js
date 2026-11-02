@@ -1,6 +1,6 @@
 import { rota, usuarioDaRequisicao, invocarIA, ErroHttp, REGRA_LINK_OFICIAL, CAMPOS_LINK, comLinksOficiais } from "./_lib.js";
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 const CATEGORIAS = ["atração", "refeição", "transporte", "hospedagem", "estacionamento", "outro"];
 
