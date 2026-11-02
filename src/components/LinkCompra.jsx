@@ -26,7 +26,7 @@ export default function LinkCompra({ sugestao, compacto = false }) {
       rel="noreferrer"
       title={oficial ? `Site oficial: ${dominio(oficial)}` : "Procurar o site oficial de venda"}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg font-semibold transition-colors",
+        "inline-flex items-center gap-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors",
         compacto ? "px-2.5 py-1.5 text-[11px]" : "px-3 py-1.5 text-xs",
         oficial
           ? "bg-green-600 text-white hover:bg-green-700"
@@ -35,7 +35,7 @@ export default function LinkCompra({ sugestao, compacto = false }) {
     >
       {oficial ? <Ticket className="w-3.5 h-3.5" /> : <Search className="w-3.5 h-3.5" />}
       {oficial ? "Comprar / reservar" : "Procurar site oficial"}
-      {oficial && !compacto && <span className="font-normal opacity-80">· {dominio(oficial)}</span>}
+      {oficial && !compacto && <span className="hidden sm:inline font-normal opacity-80">· {dominio(oficial)}</span>}
     </a>
   );
 }
