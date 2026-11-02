@@ -1,11 +1,12 @@
 import { usuarioDaRequisicao } from "./_lib.js";
 
-// Atualiza a cotação EUR→BRL. Chamada pelo agendamento do banco (a cada 12 h, com segredo)
+// Atualiza a cotação EUR→BRL. Chamada pelo agendamento do banco (a cada 12 h)
 // e pelo próprio app quando a cotação passa de 12 h. Tenta 3 fontes em ordem; se todas
 // falharem, mantém a última cotação boa e registra o erro.
 export const config = { maxDuration: 60 };
 
-const DOZE_HORAS = 12 * 3600 * 1000;
+// abaixo de 12 h de propósito: o agendamento roda a cada 12 h e sempre passa
+const ONZE_HORAS = 11 * 3600 * 1000;
 const INTERVALO_MINIMO_APP = 10 * 60 * 1000; // botão "Atualizar agora": no máximo a cada 10 min
 const FAIXA = [3, 15]; // R$ por €: fora disso é dado errado, não cotação
 
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
   const segredo = process.env.CRON_SECRET;
   const agendado = !!segredo && req.headers["x-cron-secret"] === segredo;
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
-  const origem = agendado ? "agendado" : body.agora ? "manual" : "app";
+  const origem = agendado || body.origem === "agendado" ? "agendado" : body.agora ? "manual" : "app";
 
   try {
     const { db } = await usuarioDaRequisicao(req);
@@ -84,7 +85,7 @@ export default async function handler(req, res) {
     const idade = ultima?.atualizado_em ? Date.now() - new Date(ultima.atualizado_em).getTime() : Infinity;
 
     // sem o segredo do agendamento, não deixa ninguém disparar buscas sem parar
-    const minimo = agendado ? 0 : origem === "manual" ? INTERVALO_MINIMO_APP : DOZE_HORAS;
+    const minimo = agendado ? 0 : origem === "manual" ? INTERVALO_MINIMO_APP : ONZE_HORAS;
     if (idade < minimo) return res.status(200).json({ atualizado: false, motivo: "recente", cambio: ultima });
 
     let cotacao;
