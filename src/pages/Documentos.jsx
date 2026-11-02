@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { FileCheck, Plus, CheckCircle2, Circle, Trash2, X, ShieldCheck, FileText, Car, CreditCard } from "lucide-react";
+import { FileCheck, Plus, CheckCircle2, Circle, Trash2, X, ShieldCheck, FileText, Car, CreditCard, Smartphone } from "lucide-react";
 import { useChecklist, useViajantes, useInvalidate } from "@/lib/useTrip";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
 import { usePermissao } from "@/lib/usePermissao";
 import { cn } from "@/lib/utils";
+import InternetCelular from "@/components/InternetCelular";
 
 const CAT_ICON = {
   Documentos: FileText,
   Seguros: ShieldCheck,
   Carro: Car,
   Finanças: CreditCard,
+  Internet: Smartphone,
 };
 
 export default function Documentos() {
@@ -50,6 +52,8 @@ export default function Documentos() {
           Passaportes, seguro-viagem, habilitação internacional e exigências de cada país. Marque por viajante.
         </p>
       </header>
+
+      <InternetCelular />
 
       {/* Seletor de viajante */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">

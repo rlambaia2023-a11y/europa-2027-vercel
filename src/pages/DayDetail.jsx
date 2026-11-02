@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import {
   MapPin, Clock, ArrowLeft, Plus, ExternalLink, Trash2, Navigation, Car, Utensils, Camera, BedDouble, Map as MapIcon, CalendarPlus,
 } from "lucide-react";
-import { useDias, useAtividades, useInvalidate, doRoteiro } from "@/lib/useTrip";
+import { useDias, useCidades, useAtividades, useInvalidate, doRoteiro } from "@/lib/useTrip";
+import { AvisoInternetDia } from "@/components/InternetCelular";
 import { formatarData } from "@/lib/tripData";
 import { buildDayCalendarUrl } from "@/lib/googleCalendar";
 import ChecklistRapido from "@/components/ChecklistRapido";
@@ -31,6 +32,8 @@ export default function DayDetail() {
   const invalidate = useInvalidate();
   const { podeEditar } = usePermissao();
   const dia = (dias || []).find((d) => d.data === diaData);
+  const { data: cidades } = useCidades();
+  const paisDoDia = (cidades || []).find((c) => c.nome === dia?.cidade)?.pais;
   const [adicionando, setAdicionando] = useState(false);
   const [form, setForm] = useState({ horario: "", nome: "", endereco: "", tempo_visita: "", deslocamento: "", lat: "", lng: "", link: "", categoria: "atração" });
 
@@ -109,6 +112,8 @@ export default function DayDetail() {
           )}
         </div>
       </header>
+
+      <AvisoInternetDia pais={paisDoDia} cidade={dia?.cidade} />
 
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold text-primary">Atividades do dia</h2>
