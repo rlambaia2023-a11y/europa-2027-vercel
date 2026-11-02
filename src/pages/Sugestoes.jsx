@@ -8,6 +8,7 @@ import { useCidades, useDias, useViajantes, useInvalidate, doRoteiro } from "@/l
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
 import { usePermissao } from "@/lib/usePermissao";
+import LinkCompra, { InfoIngresso, linkDeCompra } from "@/components/LinkCompra";
 import { formatarData } from "@/lib/tripData";
 import { cn } from "@/lib/utils";
 
@@ -102,7 +103,7 @@ export default function Sugestoes() {
         lat: s.lat || undefined,
         lng: s.lng || undefined,
         categoria: "atração",
-        link: s.lat && s.lng ? `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}` : undefined,
+        link: linkDeCompra(s) || undefined,
       });
       setAdicionadas((p) => ({ ...p, [s.nome]: alvo }));
       invalidate([["atividades", alvo], ["atividades", "all"]]);
@@ -119,6 +120,8 @@ export default function Sugestoes() {
       s.descricao ? s.descricao : "",
       s.motivo ? `Por que visitar: ${s.motivo}` : "",
       s.tempo_visita ? `Tempo de visita: ${s.tempo_visita}` : "",
+      s.ingresso ? `Ingresso: ${s.ingresso}` : "",
+      linkDeCompra(s) ? `${s.link_oficial ? "Comprar / reservar" : "Site oficial"}: ${linkDeCompra(s)}` : "",
     ].filter(Boolean).join("\n");
   }
 
@@ -255,6 +258,7 @@ export default function Sugestoes() {
                     </div>
                     {s.descricao && <p className="text-sm text-foreground/80 mt-2 leading-relaxed">{s.descricao}</p>}
                     {s.motivo && <p className="text-xs text-accent mt-2 italic leading-relaxed">{s.motivo}</p>}
+                    <InfoIngresso sugestao={s} className="mt-2" />
                     {s.endereco && (
                       <p className="text-[11px] text-muted-foreground mt-2 flex items-start gap-1">
                         <MapPin className="w-3 h-3 mt-0.5 shrink-0" /> {s.endereco}
@@ -274,6 +278,7 @@ export default function Sugestoes() {
                       <Plus className="w-3.5 h-3.5" /> Itinerário
                     </button>
                   )}
+                  <LinkCompra sugestao={s} />
                   {salvaEm && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-accent font-medium">
                       <BookOpen className="w-3.5 h-3.5" /> No diário · {formatarData(salvaEm)}

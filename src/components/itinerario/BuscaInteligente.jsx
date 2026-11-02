@@ -4,6 +4,7 @@ import { Sparkles, Search, Loader2, MapPin, Clock, Plus, Check, ExternalLink, Im
 import { base44 } from "@/api/base44Client";
 import { useDiario, useInvalidate } from "@/lib/useTrip";
 import { formatarData } from "@/lib/tripData";
+import LinkCompra, { InfoIngresso, linkDeCompra } from "@/components/LinkCompra";
 import SeletorFotosGaleria from "./SeletorFotosGaleria";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -74,7 +75,7 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
         lng: s.lng || undefined,
         categoria: "atração",
         roteiro,
-        link: s.lat && s.lng ? `https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}` : undefined,
+        link: linkDeCompra(s) || undefined,
       });
       setAdicionadas((p) => ({ ...p, [s.nome]: diaAlvo }));
       invalidate([["atividades", diaAlvo], ["atividades", "all"]]);
@@ -215,6 +216,7 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
                   </div>
                   {s.descricao && <p className="text-xs text-foreground/80 mt-1.5 leading-relaxed">{s.descricao}</p>}
                   {s.motivo && <p className="text-[11px] text-accent mt-1.5 italic leading-relaxed">{s.motivo}</p>}
+                  <InfoIngresso sugestao={s} className="mt-1.5" />
                   {s.endereco && (
                     <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1">
                       <MapPin className="w-3 h-3 mt-0.5 shrink-0" /> {s.endereco}
@@ -233,6 +235,7 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
                         <Plus className="w-3 h-3" /> Adicionar
                       </button>
                     )}
+                    <LinkCompra sugestao={s} compacto />
                     {s.lat && s.lng && (
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`}

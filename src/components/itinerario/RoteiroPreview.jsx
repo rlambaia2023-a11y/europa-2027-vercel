@@ -39,6 +39,7 @@ export default function RoteiroPreview({ dias, selecionados, onToggle }) {
                       <li key={j} className="text-[11px] text-muted-foreground flex gap-1.5">
                         <span className="text-accent font-medium shrink-0">{a.horario || "—"}</span>
                         <span className="truncate">{a.nome}</span>
+                        {a.link_oficial && <span className="shrink-0 text-green-600" title="Tem link oficial de compra">🎟</span>}
                       </li>
                     ))}
                   </ul>

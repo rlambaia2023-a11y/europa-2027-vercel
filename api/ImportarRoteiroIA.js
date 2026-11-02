@@ -1,4 +1,4 @@
-import { rota, usuarioDaRequisicao, invocarIA, ErroHttp } from "./_lib.js";
+import { rota, usuarioDaRequisicao, invocarIA, ErroHttp, REGRA_LINK_OFICIAL, CAMPOS_LINK, comLinksOficiais } from "./_lib.js";
 
 export const config = { maxDuration: 60 };
 
@@ -28,7 +28,10 @@ Regras:
 3. Para cada dia informe: titulo (curto e descritivo), cidade principal, pais e um destaque com 1 a 2 frases resumindo o dia.
 4. Extraia as atividades na ordem em que aparecem, com horario (HH:MM quando existir, senão "manhã", "tarde" ou "noite"), nome, endereco, tempo_visita e categoria, que deve ser exatamente uma destas: "atração", "refeição", "transporte", "hospedagem", "estacionamento", "outro".
 5. Não invente dias ou atividades que não estejam no conteúdo.
-6. Ignore links de imagens e textos de marketing, mas aproveite nomes de lugares citados nas legendas das imagens como atividades.`;
+6. Ignore links de imagens e textos de marketing, mas aproveite nomes de lugares citados nas legendas das imagens como atividades.
+7. Se o conteúdo trouxer o link de compra ou reserva de uma atividade, use-o em "link_oficial".
+
+${REGRA_LINK_OFICIAL}`;
 
   const partes = [instrucoes];
   if (busca) {
@@ -66,6 +69,7 @@ ${busca}
                   endereco: { type: "string" },
                   tempo_visita: { type: "string" },
                   categoria: { type: "string", enum: CATEGORIAS },
+                  ...CAMPOS_LINK,
                 },
                 required: ["nome"],
               },
@@ -79,5 +83,11 @@ ${busca}
   };
 
   const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls, internet: !!busca });
-  return { dias: Array.isArray(dados?.dias) ? dados.dias : [] };
+  const dias = Array.isArray(dados?.dias) ? dados.dias : [];
+  // confere os links de todas as atividades de uma vez, mantendo a cidade de cada dia
+  const todas = dias.flatMap((d, i) => (Array.isArray(d.atividades) ? d.atividades : []).map((a) => ({ ...a, cidade: d.cidade, _dia: i })));
+  const conferidas = await comLinksOficiais(todas.slice(0, 120));
+  dias.forEach((d) => { d.atividades = []; });
+  for (const { _dia, cidade, ...a } of conferidas) dias[_dia].atividades.push(a);
+  return { dias };
 });

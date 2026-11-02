@@ -1,4 +1,4 @@
-import { rota, usuarioDaRequisicao, invocarIA, ErroHttp } from "./_lib.js";
+import { rota, usuarioDaRequisicao, invocarIA, ErroHttp, REGRA_LINK_OFICIAL, CAMPOS_LINK, comLinksOficiais } from "./_lib.js";
 
 export const config = { maxDuration: 60 };
 
@@ -17,6 +17,7 @@ export default rota(async (req, body) => {
   const local = pais ? `${cidade}, ${pais}` : cidade;
   const partes = [
     `Sugira 8 pontos turísticos e atrações imperdíveis${local ? ` para visitar em ${local}` : " para uma road trip pela Itália, Croácia, Montenegro e Bósnia"}, voltados para turistas brasileiros viajando em março e abril de 2027. Para cada atração forneça: nome, uma descrição curta de 1 a 2 frases, o endereço ou localização aproximada, o tempo médio de visita (ex: "2-3h"), por que vale a pena visitar (1 frase) e as coordenadas aproximadas em latitude e longitude decimais. Inclua atrações históricas, culturais, gastronômicas e naturais relevantes. Responda em português do Brasil.`,
+    REGRA_LINK_OFICIAL,
   ];
   if (consulta) {
     partes.push(`Busca do viajante: "${consulta}". Priorize exclusivamente sugestões que atendam a esse pedido e pesquise na internet informações reais e atuais desses lugares.`);
@@ -40,6 +41,7 @@ export default rota(async (req, body) => {
             motivo: { type: "string" },
             lat: { type: "number" },
             lng: { type: "number" },
+            ...CAMPOS_LINK,
           },
           required: ["nome", "descricao"],
         },
@@ -49,5 +51,6 @@ export default rota(async (req, body) => {
   };
 
   const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls: fotos, internet: !!consulta });
-  return { sugestoes: Array.isArray(dados?.sugestoes) ? dados.sugestoes : [] };
+  const sugestoes = Array.isArray(dados?.sugestoes) ? dados.sugestoes : [];
+  return { sugestoes: await comLinksOficiais(sugestoes, local) };
 });

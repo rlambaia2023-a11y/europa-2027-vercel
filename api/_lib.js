@@ -73,6 +73,53 @@ async function arquivoComoParte(url) {
   return { inline_data: { mime_type: tipo, data: bytes.toString("base64") } };
 }
 
+// Instrução comum: toda sugestão traz o link oficial de compra/reserva
+export const REGRA_LINK_OFICIAL = `Para cada lugar, passeio, evento ou serviço, preencha "link_oficial" com a URL da página OFICIAL onde se compra o ingresso ou se faz a reserva: site do próprio museu/atração, bilheteria oficial do evento, operadora oficial do passeio, companhia de transporte ou locadora de carros. Prefira sempre o site oficial a revendedores (GetYourGuide, Viator, Civitatis, Tiqets); use revendedor só se não existir venda oficial. Para lugares gratuitos sem reserva, use o site oficial de informações. Em "ingresso", diga em poucas palavras como e quanto se paga (ex: "€18 · reserva antecipada obrigatória", "Gratuito"). Nunca invente URL: se não tiver certeza do endereço, deixe "link_oficial" vazio.`;
+
+export const CAMPOS_LINK = {
+  link_oficial: { type: "string", description: "URL oficial de compra de ingresso ou reserva" },
+  ingresso: { type: "string", description: "Como e quanto se paga, em poucas palavras" },
+};
+
+export function linkBusca(nome, local) {
+  const q = [nome, local, "site oficial ingressos reserva"].filter(Boolean).join(" ");
+  return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+}
+
+// A página abre? Sites que barram robôs (401/403/405/429) contam como existentes.
+async function linkAbre(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" || /(^|\.)google\.[a-z.]+$/i.test(u.hostname)) return false;
+    const r = await fetch(u, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Europa2027/1.0)", Accept: "text/html,*/*" },
+    });
+    r.body?.cancel().catch(() => {});
+    return r.status < 400 || [401, 403, 405, 429].includes(r.status);
+  } catch {
+    return false;
+  }
+}
+
+// Confere os links oficiais (em lotes) e garante sempre um caminho para comprar.
+export async function comLinksOficiais(itens, local) {
+  const saida = [];
+  for (let i = 0; i < itens.length; i += 8) {
+    const lote = itens.slice(i, i + 8);
+    const ok = await Promise.all(lote.map((it) => (it?.link_oficial ? linkAbre(String(it.link_oficial).trim()) : false)));
+    lote.forEach((it, j) => {
+      saida.push({
+        ...it,
+        link_oficial: ok[j] ? String(it.link_oficial).trim() : "",
+        link_busca: linkBusca(it?.nome, it?.cidade || local),
+      });
+    });
+  }
+  return saida;
+}
+
 function extrairJson(texto) {
   const limpo = String(texto || "").replace(/```(?:json)?/gi, "").trim();
   try { return JSON.parse(limpo); } catch { /* tenta o maior bloco {…} */ }

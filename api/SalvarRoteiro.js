@@ -5,7 +5,12 @@ export const config = { maxDuration: 60 };
 const CATEGORIAS = ["atração", "refeição", "transporte", "hospedagem", "estacionamento", "outro"];
 const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const txt = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+// link de compra/reserva: o oficial conferido, senão a busca pelo site oficial
+const linkCompra = (a) => {
+  const url = txt(a?.link_oficial, 500) || txt(a?.link, 500) || txt(a?.link_busca, 500);
+  return /^https:\/\//i.test(url) ? url : "";
+};
+const norm = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 async function ok(consulta) {
   const { data, error } = await consulta;
@@ -32,6 +37,7 @@ export default rota(async (req, body) => {
         endereco: txt(a?.endereco, 300),
         tempo_visita: txt(a?.tempo_visita, 60),
         categoria: CATEGORIAS.includes(a?.categoria) ? a.categoria : "atração",
+        link: linkCompra(a),
       }))
       .filter((a) => a.nome);
     dias.push({

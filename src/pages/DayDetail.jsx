@@ -179,7 +179,7 @@ export default function DayDetail() {
                   <div className="flex items-center gap-3 mt-2">
                     {a.link && (
                       <a href={a.link} target="_blank" rel="noreferrer" className="text-[11px] text-accent font-medium inline-flex items-center gap-1 hover:underline">
-                        <ExternalLink className="w-3 h-3" /> Abrir link
+                        <ExternalLink className="w-3 h-3" /> {a.link.includes("google.com/search") ? "Procurar site oficial" : "Site oficial / comprar"}
                       </a>
                     )}
                     {a.lat && a.lng && (
