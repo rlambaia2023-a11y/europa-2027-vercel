@@ -82,7 +82,7 @@ ${busca}
     required: ["dias"],
   };
 
-  const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls, internet: !!busca });
+  const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls, internet: !!busca, busca });
   const dias = Array.isArray(dados?.dias) ? dados.dias : [];
   // confere os links de todas as atividades de uma vez, mantendo a cidade de cada dia
   const todas = dias.flatMap((d, i) => (Array.isArray(d.atividades) ? d.atividades : []).map((a) => ({ ...a, cidade: d.cidade, _dia: i })));

@@ -119,7 +119,10 @@ export async function comLinksOficiais(itens, local) {
   const saida = [];
   for (let i = 0; i < itens.length; i += 8) {
     const lote = itens.slice(i, i + 8);
-    const conferidos = await Promise.all(lote.map((it) => linkConferido(String(it?.link_oficial || "").trim())));
+    const conferidos = await Promise.all(lote.map(async (it) => {
+      const link = await linkConferido(String(it?.link_oficial || "").trim());
+      return link || linkPeloBrave(it?.nome, it?.cidade || local);
+    }));
     lote.forEach((it, j) => {
       saida.push({ ...it, link_oficial: conferidos[j], link_busca: linkBusca(it?.nome, it?.cidade || local) });
     });
@@ -138,12 +141,65 @@ function extrairJson(texto) {
   throw new ErroHttp(502, "A IA respondeu num formato inesperado. Tente de novo.");
 }
 
+// Busca na web pelo Brave (rápida). Sem chave ou com erro, devolve null e quem chamou segue sem ela.
+export async function buscarBrave(q, count = 10) {
+  const chave = process.env.BRAVE_API_KEY;
+  if (!chave || !q) return null;
+  try {
+    const u = new URL("https://api.search.brave.com/res/v1/web/search");
+    u.searchParams.set("q", q);
+    u.searchParams.set("count", String(count));
+    u.searchParams.set("extra_snippets", "true");
+    const r = await fetch(u, {
+      headers: { Accept: "application/json", "X-Subscription-Token": chave },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!r.ok) {
+      console.error("Brave", r.status);
+      return null;
+    }
+    const d = await r.json();
+    return (d.web?.results || []).map((x) => ({
+      titulo: x.title,
+      url: x.url,
+      texto: [x.description, ...(x.extra_snippets || [])].filter(Boolean).join(" ").replace(/<[^>]+>/g, ""),
+    }));
+  } catch (e) {
+    console.error("Brave", e?.message);
+    return null;
+  }
+}
+
+// Revendedores e páginas que não vendem nada: só servem se não houver nada melhor.
+const NAO_OFICIAIS = /(google|wikipedia|wikivoyage|tripadvisor|youtube|facebook|instagram|tiktok|reddit|pinterest|getyourguide|viator|civitatis|tiqets|klook|musement|headout|expedia|booking|trip\.com|lonelyplanet)\./i;
+
+// Para quem ficou sem link oficial: procura no Brave e usa o primeiro resultado oficial.
+async function linkPeloBrave(nome, local) {
+  const res = await buscarBrave(`${nome} ${local || ""} site oficial ingressos reserva`.trim(), 6);
+  if (!res?.length) return "";
+  const host = (url) => { try { return new URL(url).hostname; } catch { return ""; } };
+  const oficial = res.find((x) => x.url?.startsWith("https://") && !NAO_OFICIAIS.test(host(x.url)));
+  return oficial?.url || "";
+}
+
 // Equivalente ao InvokeLLM do Base44: prompt + arquivos + schema → objeto JSON.
-// Com `internet`, usa a busca do Google (que não aceita schema; pedimos o JSON no texto).
-export async function invocarIA({ prompt, schema, fileUrls = [], internet = false }) {
+// Com `internet`: se houver Brave e `busca`, os resultados dele entram no prompt e a IA responde
+// direto em JSON (bem mais rápido); senão, usa a busca do Google do próprio Gemini.
+export async function invocarIA({ prompt, schema, fileUrls = [], internet = false, busca = "" }) {
   const chave = process.env.GEMINI_API_KEY;
   if (!chave) throw new ErroHttp(503, "A IA ainda não foi configurada (falta GEMINI_API_KEY no Vercel).");
   const modelo = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+  let comBrave = false;
+  if (internet && busca) {
+    const resultados = await buscarBrave(busca, 15);
+    if (resultados?.length) {
+      comBrave = true;
+      const fontes = resultados.map((x, i) => `[${i + 1}] ${x.titulo}\n${x.url}\n${x.texto}`).join("\n\n");
+      prompt = `${prompt}\n\nRESULTADOS DE BUSCA NA INTERNET (atuais, use como fonte principal; os endereços listados são reais e podem ser usados em link_oficial):\n${fontes}`;
+      internet = false;
+    }
+  }
 
   const partes = [{ text: internet
     ? `${prompt}\n\nResponda APENAS com um objeto JSON válido, sem texto antes ou depois, seguindo este JSON Schema:\n${JSON.stringify(schema)}`
@@ -153,6 +209,8 @@ export async function invocarIA({ prompt, schema, fileUrls = [], internet = fals
   const corpo = { contents: [{ role: "user", parts: partes }] };
   if (internet) corpo.tools = [{ google_search: {} }];
   else corpo.generationConfig = { responseMimeType: "application/json", responseSchema: paraSchemaGemini(schema) };
+  // com as fontes já na mão, a IA só organiza: dispensa o "raciocínio" longo e responde mais rápido
+  if (comBrave) corpo.generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, {
     method: "POST",

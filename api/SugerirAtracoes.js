@@ -50,7 +50,8 @@ export default rota(async (req, body) => {
   };
 
   // sempre com busca na internet: os links oficiais saem reais, não inventados
-  const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls: fotos, internet: true });
+  const dados = await invocarIA({ prompt: partes.join("\n\n"), schema, fileUrls: fotos, internet: true,
+    busca: consulta ? `${consulta} ${local}` : `${local} principais atrações pontos turísticos ingressos` });
   const sugestoes = Array.isArray(dados?.sugestoes) ? dados.sugestoes : [];
   return { sugestoes: await comLinksOficiais(sugestoes, local) };
 });
