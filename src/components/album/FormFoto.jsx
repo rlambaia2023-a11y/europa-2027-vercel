@@ -1,9 +1,11 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { ImagePlus, Loader2, MapPin, Navigation, Trash2, Save } from "lucide-react";
+import { ImagePlus, Loader2, MapPin, Navigation, Trash2, Save, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
 import { formatarData } from "@/lib/tripData";
+import { comprimirImagem } from "@/lib/imagem";
+import SignedImage from "@/components/SignedImage";
 
 export default function FormFoto({ dias, viajantes, onSaved }) {
   const [form, setForm] = useState({
@@ -25,8 +27,9 @@ export default function FormFoto({ dias, viajantes, onSaved }) {
     const uris = [];
     for (const f of Array.from(files)) {
       try {
-        const res = await base44.integrations.Core.UploadPublicFile({ file: f });
-        uris.push(res.file_url);
+        // pasta privada: só quem usa o app vê as fotos da família
+        const res = await base44.integrations.Core.UploadPrivateFile({ file: await comprimirImagem(f) });
+        uris.push(res.file_uri);
       } catch {
         toast.error(`Erro no envio de ${f.name}`);
       }
@@ -114,14 +117,28 @@ export default function FormFoto({ dias, viajantes, onSaved }) {
       <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-lg p-5 cursor-pointer hover:border-accent text-muted-foreground">
         {subindo ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImagePlus className="w-5 h-5" />}
         <span className="text-xs text-center">
-          {subindo ? "Enviando fotos…" : "Toque para escolher fotos da câmera ou galeria (armazenadas publicamente — qualquer pessoa com o link pode abrir)"}
+          {subindo ? "Enviando fotos…" : "Toque para escolher fotos da câmera ou galeria"}
         </span>
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => subirFotos(e.target.files)} />
       </label>
 
       {fotos.length > 0 && (
-        <p className="text-[11px] text-accent font-medium">{fotos.length} foto(s) prontas para salvar</p>
+        <div>
+          <p className="text-[11px] text-accent font-medium mb-2">{fotos.length} foto(s) prontas para salvar</p>
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+            {fotos.map((uri) => (
+              <div key={uri} className="relative aspect-square rounded-lg overflow-hidden bg-secondary">
+                <SignedImage fileUri={uri} className="w-full h-full object-cover" />
+                <button type="button" onClick={() => setFotos((p) => p.filter((u) => u !== uri))}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  aria-label="Tirar esta foto">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="grid sm:grid-cols-2 gap-3">

@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { usePermissao } from "@/lib/usePermissao";
 import { formatarData } from "@/lib/tripData";
 import GaleriaFotos from "@/components/diario/GaleriaFotos";
+import { comprimirImagem } from "@/lib/imagem";
 
 export default function Diario() {
   const { data: todosDias } = useDias();
@@ -133,7 +134,7 @@ function FormEntrada({ dias, viajantes, diaPadrao, onDone }) {
     const uris = [];
     for (const f of Array.from(files)) {
       try {
-        const res = await base44.integrations.Core.UploadPrivateFile({ file: f });
+        const res = await base44.integrations.Core.UploadPrivateFile({ file: await comprimirImagem(f) });
         uris.push(res.file_uri);
       } catch { toast.error(`Erro no envio de ${f.name}`); }
     }

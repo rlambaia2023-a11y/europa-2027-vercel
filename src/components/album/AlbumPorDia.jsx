@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Images, MapPin } from "lucide-react";
+import { Images, MapPin, Trash2 } from "lucide-react";
+import { toast } from "react-hot-toast";
+import { base44 } from "@/api/base44Client";
 import SignedImage from "@/components/SignedImage";
 import PhotoLightbox from "@/components/diario/PhotoLightbox";
 import { formatarData } from "@/lib/tripData";
 
-export default function AlbumPorDia({ entradas, dias }) {
+export default function AlbumPorDia({ entradas, dias, onChange }) {
   const [aberta, setAberta] = useState(null);
 
   const grupos = useMemo(() => {
@@ -46,6 +48,20 @@ export default function AlbumPorDia({ entradas, dias }) {
         <p className="text-sm text-muted-foreground">Nenhuma foto no álbum ainda.</p>
       </div>
     );
+  }
+
+  // tira uma foto do registro; registro sem fotos e sem texto some
+  async function removerFoto(e, uri) {
+    if (!window.confirm("Remover esta foto do álbum?")) return;
+    const restantes = (e.fotos || []).filter((u) => u !== uri);
+    try {
+      if (!restantes.length && !e.texto) await base44.entities.DiarioEntrada.delete(e.id);
+      else await base44.entities.DiarioEntrada.update(e.id, { fotos: restantes });
+      toast.success("Foto removida");
+      onChange?.();
+    } catch {
+      toast.error("Não foi possível remover");
+    }
   }
 
   const prev = () => setAberta((a) => a && { ...a, index: (a.index - 1 + a.fotos.length) % a.fotos.length });
@@ -89,15 +105,21 @@ export default function AlbumPorDia({ entradas, dias }) {
                 {e.texto && <p className="text-sm text-foreground/85 whitespace-pre-wrap leading-relaxed">{e.texto}</p>}
                 <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                   {(e.fotos || []).map((uri, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setAberta({ fotos: g.fotos, index: e.inicio + i })}
-                      className="group relative aspect-square rounded-lg overflow-hidden bg-secondary focus:outline-none focus:ring-2 focus:ring-ring"
-                      aria-label={`Abrir foto ${i + 1} de ${formatarData(g.data)}`}
-                    >
-                      <SignedImage fileUri={uri} alt={`Foto de ${formatarData(g.data)}`}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                    </button>
+                    <div key={i} className="group relative aspect-square rounded-lg overflow-hidden bg-secondary">
+                      <button
+                        onClick={() => setAberta({ fotos: g.fotos, index: e.inicio + i })}
+                        className="w-full h-full focus:outline-none focus:ring-2 focus:ring-ring"
+                        aria-label={`Abrir foto ${i + 1} de ${formatarData(g.data)}`}
+                      >
+                        <SignedImage fileUri={uri} alt={`Foto de ${formatarData(g.data)}`}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                      </button>
+                      <button onClick={() => removerFoto(e, uri)}
+                        className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center opacity-80 sm:opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        aria-label="Remover foto">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

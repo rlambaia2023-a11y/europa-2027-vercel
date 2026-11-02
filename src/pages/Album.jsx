@@ -17,7 +17,8 @@ export default function Album() {
     (e) => viajanteSel === "TODOS" || e.viajante_nome === viajanteSel
   );
   const totalFotos = lista.reduce((n, e) => n + (e.fotos || []).length, 0);
-  const diasComFotos = new Set(lista.filter((e) => (e.fotos || []).length).map((e) => e.dia_data)).size;
+  const comFotos = lista.filter((e) => (e.fotos || []).length);
+  const diasComFotos = new Set(comFotos.map((e) => e.dia_data)).size;
 
   return (
     <div className="space-y-6">
@@ -73,7 +74,7 @@ export default function Album() {
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">dias</p>
         </div>
         <div className="bg-card rounded-2xl border border-border shadow-soft p-3 text-center">
-          <p className="font-heading text-2xl font-semibold text-primary">{lista.length}</p>
+          <p className="font-heading text-2xl font-semibold text-primary">{comFotos.length}</p>
           <p className="text-[11px] text-muted-foreground uppercase tracking-wide">registros</p>
         </div>
       </div>
@@ -93,7 +94,7 @@ export default function Album() {
         <div className="py-16 text-center text-muted-foreground text-sm flex items-center justify-center gap-2">
           <Camera className="w-4 h-4 animate-pulse" /> Carregando o álbum…
         </div>
-      ) : lista.length === 0 ? (
+      ) : comFotos.length === 0 ? (
         <div className="py-16 text-center bg-card rounded-2xl border border-border">
           <Camera className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">
@@ -103,7 +104,7 @@ export default function Album() {
           </p>
         </div>
       ) : (
-        <AlbumPorDia entradas={lista} dias={dias || []} />
+        <AlbumPorDia entradas={lista} dias={dias || []} onChange={() => invalidate([["diario", "all"]])} />
       )}
     </div>
   );
