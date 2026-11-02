@@ -2,10 +2,15 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from '@/App.jsx'
 import '@/index.css'
+import { iniciarSincronizacao } from '@/lib/sincronizacao'
+import { queryClientInstance } from '@/lib/query-client'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />
 )
+
+// guarda tudo no aparelho e envia o que foi feito sem internet assim que houver conexão
+iniciarSincronizacao(queryClientInstance)
 
 // Mantém o app disponível sem conexão (shell e recursos já visitados)
 if (import.meta.env.PROD && "serviceWorker" in navigator) {

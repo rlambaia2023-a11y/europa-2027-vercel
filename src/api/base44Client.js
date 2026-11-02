@@ -1,6 +1,10 @@
 // Camada de compatibilidade: mesma interface do SDK do Base44 que as telas usam,
 // mas falando com o Supabase (banco, login e arquivos) e com as funções em /api.
 import { createClient } from "@supabase/supabase-js";
+import {
+  filtrarLocal, mesclarResultado, substituirTabela, aplicarLocal, enfileirar, filaPendente, ehErroDeRede,
+  lerTabela, temEspelho, guardarArquivo, lerArquivo, apagarArquivo, sincronizar,
+} from "@/lib/offline";
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -40,6 +44,11 @@ function limpar(campos, obj) {
   return saida;
 }
 
+// Sem internet (ou com alterações ainda na fila), escreve no aparelho e enfileira;
+// com internet, vai direto ao servidor. Leituras sempre respondem pelo espelho local,
+// atualizado com o servidor quando há conexão.
+const deveEnfileirar = () => !navigator.onLine || filaPendente().length > 0;
+
 function entidade(nome) {
   const [tabela, lista] = TABELAS[nome];
   const campos = lista.split(" ");
@@ -50,53 +59,159 @@ function entidade(nome) {
     return data;
   }
 
+  // tenta o servidor; se a rede falhar, faz a versão offline
+  async function comRede(online, offline) {
+    if (deveEnfileirar()) return offline();
+    try {
+      return await online();
+    } catch (e) {
+      if (ehErroDeRede(e)) return offline();
+      throw e;
+    }
+  }
+
+  const agora = () => new Date().toISOString();
+
   return {
     async filter(query = {}, { sort, limit = 100 } = {}) {
-      let c = supabase.from(tabela).select("*");
-      for (const [k, v] of Object.entries(query || {})) {
-        if (v && typeof v === "object" && Array.isArray(v.$in)) c = c.in(k, v.$in);
-        else c = c.eq(k, v);
+      if (navigator.onLine) {
+        try {
+          let c = supabase.from(tabela).select("*");
+          for (const [k, v] of Object.entries(query || {})) {
+            if (v && typeof v === "object" && Array.isArray(v.$in)) c = c.in(k, v.$in);
+            else c = c.eq(k, v);
+          }
+          if (sort) {
+            const desc = sort.startsWith("-");
+            c = c.order(desc ? sort.slice(1) : sort, { ascending: !desc, nullsFirst: false });
+          }
+          const linhas = await rodar(c.limit(limit));
+          mesclarResultado(tabela, query, linhas, linhas.length >= limit);
+        } catch (e) {
+          if (!ehErroDeRede(e) || !temEspelho(tabela)) throw e;
+        }
       }
-      if (sort) {
-        const desc = sort.startsWith("-");
-        c = c.order(desc ? sort.slice(1) : sort, { ascending: !desc, nullsFirst: false });
-      }
-      c = c.limit(limit);
-      return { items: await rodar(c) };
+      return { items: filtrarLocal(tabela, query, { sort, limit }) };
     },
     async list(sort, limit) {
       return this.filter({}, { sort, limit });
     },
     async get(id) {
-      return rodar(supabase.from(tabela).select("*").eq("id", id).single(), 404);
+      const local = () => {
+        const l = lerTabela(tabela).find((x) => x.id === id);
+        if (!l) throw erro(new Error("Registro não encontrado."), 404);
+        return l;
+      };
+      if (!navigator.onLine) return local();
+      try {
+        return await rodar(supabase.from(tabela).select("*").eq("id", id).single(), 404);
+      } catch (e) {
+        if (ehErroDeRede(e)) return local();
+        throw e;
+      }
     },
     async create(obj) {
-      return rodar(supabase.from(tabela).insert(limpar(campos, obj)).select().single());
+      const dados = limpar(campos, obj);
+      const id = crypto.randomUUID();
+      return comRede(
+        async () => {
+          const linha = await rodar(supabase.from(tabela).insert({ ...dados, id }).select().single());
+          aplicarLocal(tabela, linha, "create");
+          return linha;
+        },
+        () => {
+          const linha = { ...dados, id, created_date: agora(), updated_date: agora() };
+          enfileirar({ tabela, tipo: "create", id, dados: linha });
+          return linha;
+        }
+      );
     },
     async bulkCreate(lista) {
-      if (!lista?.length) return [];
-      return rodar(supabase.from(tabela).insert(lista.map((o) => limpar(campos, o))).select());
+      const criados = [];
+      for (const o of lista || []) criados.push(await this.create(o));
+      return criados;
     },
     async update(id, patch) {
-      return rodar(supabase.from(tabela).update(limpar(campos, patch)).eq("id", id).select().single());
+      const dados = limpar(campos, patch);
+      return comRede(
+        async () => {
+          const linha = await rodar(supabase.from(tabela).update(dados).eq("id", id).select().single());
+          aplicarLocal(tabela, linha, "update");
+          return linha;
+        },
+        () => {
+          enfileirar({ tabela, tipo: "update", id, dados: { ...dados, updated_date: agora() } });
+          return { ...(lerTabela(tabela).find((l) => l.id === id) || {}), id };
+        }
+      );
     },
     async bulkUpdate(lista) {
-      return Promise.all((lista || []).map(({ id, ...patch }) => this.update(id, patch)));
+      const feitos = [];
+      for (const { id, ...patch } of lista || []) feitos.push(await this.update(id, patch));
+      return feitos;
     },
     async delete(id) {
-      await rodar(supabase.from(tabela).delete().eq("id", id));
-      return { ok: true };
+      return comRede(
+        async () => {
+          await rodar(supabase.from(tabela).delete().eq("id", id));
+          aplicarLocal(tabela, id, "delete");
+          return { ok: true };
+        },
+        () => {
+          enfileirar({ tabela, tipo: "delete", id });
+          return { ok: true };
+        }
+      );
     },
     async deleteMany(query = {}) {
-      let c = supabase.from(tabela).delete();
-      for (const [k, v] of Object.entries(query)) {
-        c = v && typeof v === "object" && Array.isArray(v.$in) ? c.in(k, v.$in) : c.eq(k, v);
-      }
-      await rodar(c);
+      const ids = filtrarLocal(tabela, query, { limit: 5000 }).map((l) => l.id);
+      for (const id of ids) await this.delete(id);
       return { ok: true };
     },
   };
 }
+
+// ---------- sincronização com o servidor ----------
+
+const NOMES_TABELAS = Object.values(TABELAS).map(([t]) => t);
+
+function camposDe(tabela) {
+  return Object.values(TABELAS).find(([t]) => t === tabela)[1].split(" ");
+}
+
+// traz todas as tabelas de novo (o espelho passa a refletir o que os outros mudaram)
+export async function baixarTudo() {
+  const resultados = await Promise.all(
+    NOMES_TABELAS.map(async (t) => {
+      const { data, error } = await supabase.from(t).select("*").limit(5000);
+      if (error) throw erro(error);
+      return [t, data];
+    })
+  );
+  resultados.forEach(([t, linhas]) => substituirTabela(t, linhas));
+}
+
+// envia uma alteração da fila ao servidor (repetir não duplica nada)
+async function executarOp(op) {
+  if (op.tipo === "upload") {
+    const blob = await lerArquivo(op.chave);
+    if (blob) {
+      const { error } = await supabase.storage.from(op.bucket).upload(op.caminho, blob, { contentType: blob.type || undefined, upsert: true });
+      if (error) throw erro(error);
+      await apagarArquivo(op.chave);
+    }
+    return;
+  }
+  const q = supabase.from(op.tabela);
+  const { error } = op.tipo === "create"
+    ? await q.upsert({ ...limpar(camposDe(op.tabela), op.dados), id: op.id })
+    : op.tipo === "update"
+      ? await q.update(limpar(camposDe(op.tabela), op.dados)).eq("id", op.id)
+      : await q.delete().eq("id", op.id);
+  if (error) throw erro(error);
+}
+
+export const sincronizarAgora = () => sincronizar({ executar: executarOp, baixarTudo });
 
 const PUBLICAS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
@@ -174,8 +289,21 @@ function nomeArquivo(file) {
 async function enviar(bucket, file) {
   const { data: { session } } = await supabase.auth.getSession();
   const caminho = `${session?.user.id || "familia"}/${nomeArquivo(file)}`;
+  // sem internet: o arquivo fica no aparelho e o envio entra na fila
+  const guardarParaDepois = async () => {
+    const chave = `${bucket}/${caminho}`;
+    await guardarArquivo(chave, file);
+    enfileirar({ tipo: "upload", bucket, caminho, chave });
+  };
+  if (!navigator.onLine) {
+    await guardarParaDepois();
+    return caminho;
+  }
   const { error } = await supabase.storage.from(bucket).upload(caminho, file, { contentType: file.type || undefined });
-  if (error) throw erro(error, 400);
+  if (error) {
+    if (ehErroDeRede(error)) await guardarParaDepois();
+    else throw erro(error, 400);
+  }
   return caminho;
 }
 
@@ -199,16 +327,32 @@ const integrations = {
       if (error) throw erro(error, 400);
     },
     async CreateFileSignedUrl({ file_uri, expires_in = 3600 }) {
+      // arquivo tirado sem internet e ainda não enviado: mostra direto do aparelho
+      const local = await lerArquivo(file_uri);
+      if (local) return { signed_url: URL.createObjectURL(local) };
+      const chave = "assinada:" + file_uri;
       const [bucket, ...resto] = String(file_uri || "").split("/");
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(resto.join("/"), expires_in);
-      if (error) throw erro(error, 404);
-      return { signed_url: data.signedUrl };
+      try {
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(resto.join("/"), expires_in);
+        if (error) throw erro(error, 404);
+        try { localStorage.setItem(chave, data.signedUrl); } catch { /* sem espaço */ }
+        return { signed_url: data.signedUrl };
+      } catch (e) {
+        // sem internet: o último endereço serve, porque a imagem fica guardada pelo service worker
+        let anterior = null;
+        try { anterior = localStorage.getItem(chave); } catch { /* sem acesso */ }
+        if (anterior && ehErroDeRede(e)) return { signed_url: anterior };
+        throw e;
+      }
     },
   },
 };
 
 const functions = {
   async invoke(nome, corpo = {}) {
+    if (!navigator.onLine) {
+      throw erro(new Error("Sem internet: a IA, as importações e o câmbio voltam a funcionar quando a conexão voltar."), 0);
+    }
     const { data: { session } } = await supabase.auth.getSession();
     const resposta = await fetch(`/api/${nome}`, {
       method: "POST",

@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
-import { comCache } from "@/lib/offlineCache";
 
 export const q = {
   dias: () => ["dias"],
@@ -22,33 +21,30 @@ export const doRoteiro = (lista, roteiro = "principal") =>
 export function useDias() {
   return useQuery({
     queryKey: q.dias(),
-    queryFn: () =>
-      comCache("dias", async () => {
-        const res = await base44.entities.Dia.filter({}, { sort: "data", limit: 100 });
-        return res.items;
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.Dia.filter({}, { sort: "data", limit: 100 });
+      return res.items;
+    },
   });
 }
 
 export function useCidades() {
   return useQuery({
     queryKey: q.cidades(),
-    queryFn: () =>
-      comCache("cidades", async () => {
-        const res = await base44.entities.Cidade.filter({}, { sort: "ordem", limit: 100 });
-        return res.items;
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.Cidade.filter({}, { sort: "ordem", limit: 100 });
+      return res.items;
+    },
   });
 }
 
 export function useViajantes() {
   return useQuery({
     queryKey: q.viajantes(),
-    queryFn: () =>
-      comCache("viajantes", async () => {
-        const res = await base44.entities.Viajante.filter({}, { limit: 50 });
-        return res.items;
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.Viajante.filter({}, { limit: 50 });
+      return res.items;
+    },
   });
 }
 
@@ -86,11 +82,10 @@ export function useCambio() {
 export function useChecklist() {
   return useQuery({
     queryKey: q.checklist(),
-    queryFn: () =>
-      comCache("checklist", async () => {
-        const res = await base44.entities.ChecklistItem.filter({}, { limit: 500 });
-        return res.items;
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.ChecklistItem.filter({}, { limit: 500 });
+      return res.items;
+    },
   });
 }
 
@@ -98,22 +93,20 @@ export function useAtividades(diaData, roteiro = "principal") {
   return useQuery({
     queryKey: [...q.atividades(diaData || "none"), roteiro],
     enabled: !!diaData,
-    queryFn: () =>
-      comCache(`atividades:${diaData}:${roteiro}`, async () => {
-        const res = await base44.entities.Atividade.filter({ dia_data: diaData }, { sort: "horario", limit: 200 });
-        return doRoteiro(res.items, roteiro);
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.Atividade.filter({ dia_data: diaData }, { sort: "horario", limit: 200 });
+      return doRoteiro(res.items, roteiro);
+    },
   });
 }
 
 export function useAtividadesAll() {
   return useQuery({
     queryKey: q.atividadesAll(),
-    queryFn: () =>
-      comCache("atividades:todos", async () => {
-        const res = await base44.entities.Atividade.filter({}, { limit: 500 });
-        return res.items;
-      }),
+    queryFn: async () => {
+      const res = await base44.entities.Atividade.filter({}, { limit: 500 });
+      return res.items;
+    },
   });
 }
 
