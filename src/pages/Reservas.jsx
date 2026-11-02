@@ -111,13 +111,13 @@ export default function Reservas() {
       </header>
 
       {/* Abas */}
-      <div className="flex gap-2 border-b border-border">
+      <div className="flex gap-1 sm:gap-2 border-b border-border overflow-x-auto">
         {TIPOS.map((t) => (
           <button
             key={t.id}
             onClick={() => { setAba(t.id); setAdicionando(false); }}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
+              "flex shrink-0 items-center gap-2 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors",
               aba === t.id ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
