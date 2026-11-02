@@ -74,7 +74,7 @@ async function arquivoComoParte(url) {
 }
 
 // Instrução comum: toda sugestão traz o link oficial de compra/reserva
-export const REGRA_LINK_OFICIAL = `Para cada lugar, passeio, evento ou serviço, preencha "link_oficial" com a URL da página OFICIAL onde se compra o ingresso ou se faz a reserva: site do próprio museu/atração, bilheteria oficial do evento, operadora oficial do passeio, companhia de transporte ou locadora de carros. Prefira sempre o site oficial a revendedores (GetYourGuide, Viator, Civitatis, Tiqets); use revendedor só se não existir venda oficial. Para lugares gratuitos sem reserva, use o site oficial de informações. Em "ingresso", diga em poucas palavras como e quanto se paga (ex: "€18 · reserva antecipada obrigatória", "Gratuito"). Nunca invente URL: se não tiver certeza do endereço, deixe "link_oficial" vazio.`;
+export const REGRA_LINK_OFICIAL = `Para cada lugar, passeio, evento ou serviço, preencha "link_oficial" com a URL da página OFICIAL onde se compra o ingresso ou se faz a reserva: site do próprio museu/atração, bilheteria oficial do evento, operadora oficial do passeio, companhia de transporte ou locadora de carros. Prefira sempre o site oficial a revendedores (GetYourGuide, Viator, Civitatis, Tiqets); use revendedor só se não existir venda oficial. Cuidado com sites que imitam o oficial (como tickets-rome.com ou domínios com "tickets", "ingressos" ou "biglietti" junto do nome da cidade): eles NÃO são oficiais. Blogs, guias de viagem e agregadores também não. Para lugares gratuitos sem reserva, use o site oficial de informações. Em "ingresso", diga em poucas palavras como e quanto se paga (ex: "€18 · reserva antecipada obrigatória", "Gratuito"). Nunca invente URL: se não tiver certeza do endereço, deixe "link_oficial" vazio.`;
 
 export const CAMPOS_LINK = {
   link_oficial: { type: "string", description: "URL oficial de compra de ingresso ou reserva" },
@@ -121,10 +121,19 @@ export async function comLinksOficiais(itens, local) {
     const lote = itens.slice(i, i + 8);
     const conferidos = await Promise.all(lote.map(async (it) => {
       const link = await linkConferido(String(it?.link_oficial || "").trim());
-      return link || linkPeloBrave(it?.nome, it?.cidade || local);
+      if (link && !ehRevendedor(link)) return { link, tipo: "oficial" };
+      // sem link ou só revendedor: tenta achar o site oficial de verdade no Brave
+      const oficial = await linkPeloBrave(it?.nome, it?.cidade || local);
+      if (oficial) return { link: oficial, tipo: "oficial" };
+      return link ? { link, tipo: "revendedor" } : { link: "", tipo: "" };
     }));
     lote.forEach((it, j) => {
-      saida.push({ ...it, link_oficial: conferidos[j], link_busca: linkBusca(it?.nome, it?.cidade || local) });
+      saida.push({
+        ...it,
+        link_oficial: conferidos[j].link,
+        link_tipo: conferidos[j].tipo,
+        link_busca: linkBusca(it?.nome, it?.cidade || local),
+      });
     });
   }
   return saida;
@@ -173,12 +182,33 @@ export async function buscarBrave(q, count = 10) {
 // Revendedores e páginas que não vendem nada: só servem se não houver nada melhor.
 const NAO_OFICIAIS = /(google|wikipedia|wikivoyage|tripadvisor|youtube|facebook|instagram|tiktok|reddit|pinterest|getyourguide|viator|civitatis|tiqets|klook|musement|headout|expedia|booking|trip\.com|lonelyplanet)\./i;
 
-// Para quem ficou sem link oficial: procura no Brave e usa o primeiro resultado oficial.
+// Blogs de viagem conhecidos (não vendem nada)
+const BLOGS = /(queroviajarmais|viajenaviagem|melhoresdestinos|blog)/i;
+// Imitadores conhecidos das atrações desta viagem (os oficiais são outros domínios)
+const IMITADORES_CONHECIDOS = /(galleriaborgheseroma|colosseumrometickets|colosseo-roma|vaticanmuseumstickets|tickets-split|dubrovnik-walls)\./i;
+// Domínio principal com "tickets"/"ingressos"/"biglietti": site que imita o oficial e revende
+const IMITADOR = /(tickets?|ingressos?|biglietti|entradas|tours?-)/i;
+
+function dominioPrincipal(host) {
+  const partes = host.split(".");
+  const segundoNivel = ["com", "co", "org", "gov", "net"].includes(partes[partes.length - 2]);
+  return partes.slice(segundoNivel ? -3 : -2).join(".");
+}
+
+export function ehRevendedor(url) {
+  try {
+    const host = new URL(url).hostname;
+    return NAO_OFICIAIS.test(host) || BLOGS.test(host) || IMITADORES_CONHECIDOS.test(host) || IMITADOR.test(dominioPrincipal(host));
+  } catch {
+    return true;
+  }
+}
+
+// Procura no Brave o site oficial (em inglês os oficiais aparecem melhor) e pula revendedores.
 async function linkPeloBrave(nome, local) {
-  const res = await buscarBrave(`${nome} ${local || ""} site oficial ingressos reserva`.trim(), 6);
+  const res = await buscarBrave(`${nome} ${local || ""} official website tickets`.trim(), 8);
   if (!res?.length) return "";
-  const host = (url) => { try { return new URL(url).hostname; } catch { return ""; } };
-  const oficial = res.find((x) => x.url?.startsWith("https://") && !NAO_OFICIAIS.test(host(x.url)));
+  const oficial = res.find((x) => x.url?.startsWith("https://") && !ehRevendedor(x.url));
   return oficial?.url || "";
 }
 
