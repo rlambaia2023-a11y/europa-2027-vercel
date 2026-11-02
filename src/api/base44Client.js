@@ -15,7 +15,7 @@ const TABELAS = {
   Viajante: ["viajantes", "nome papel iniciais cor user_id cidade_inicio cidade_fim"],
   Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri"],
   Despesa: ["despesas", "descricao categoria valor moeda paga coletiva viajante_nome data comprovante_uri"],
-  Cambio: ["cambio", "taxa data fonte"],
+  Cambio: ["cambio", "taxa data fonte tipo atualizado_em"],
   ChecklistItem: ["checklist_itens", "item categoria viajante_nome concluido observacao"],
   DiarioEntrada: ["diario_entradas", "dia_data viajante_nome texto fotos comprovantes local lat lng"],
 };

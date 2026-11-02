@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import {
   Plane, MapPin, CalendarDays, Wallet, Users, Hotel as HotelIcon,
-  Car, ArrowRight, Clock, CheckCircle2, Circle, AlertCircle,
+  Car, ArrowRight, CheckCircle2, Circle, AlertCircle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -11,6 +11,7 @@ import { VIAGEM, PAISES, ESTADOS_RESERVA, diasAte, formatarData } from "@/lib/tr
 import { Image } from "@/components/ui/image";
 import DespesasCategoria from "@/components/DespesasCategoria";
 import { usePermissao } from "@/lib/usePermissao";
+import CambioCard from "@/components/CambioCard";
 
 function eurToBrl(v, moeda, taxa) { return moeda === "EUR" ? v * taxa : v; }
 
@@ -106,20 +107,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border shadow-soft p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-heading text-lg font-semibold text-primary">Câmbio EUR → BRL</h2>
-            {organizador && <Link to="/admin" className="text-xs text-accent font-medium hover:underline">Atualizar</Link>}
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-heading text-3xl font-semibold text-primary">R$ {taxa.toFixed(2)}</span>
-            <span className="text-sm text-muted-foreground">por € 1</span>
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            {cambio?.data ? formatarData(cambio.data, "longo") : "—"} · {cambio?.fonte || "—"}
-          </div>
-        </div>
+        <CambioCard />
       </section>
 
       {/* Calendário dos dias */}

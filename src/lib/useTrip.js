@@ -76,7 +76,8 @@ export function useCambio() {
   return useQuery({
     queryKey: q.cambio(),
     queryFn: async () => {
-      const res = await base44.entities.Cambio.filter({}, { sort: "-data", limit: 10 });
+      // a mais recente buscada (o app guarda o histórico das cotações)
+      const res = await base44.entities.Cambio.filter({}, { sort: "-created_date", limit: 1 });
       return res.items[0] || null;
     },
   });

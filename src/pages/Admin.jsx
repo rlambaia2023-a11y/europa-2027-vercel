@@ -23,9 +23,9 @@ export default function Admin() {
     if (!taxa) return;
     try {
       if (cambio?.id) {
-        await base44.entities.Cambio.update(cambio.id, { taxa: parseFloat(taxa), fonte, data: dataCot });
+        await base44.entities.Cambio.update(cambio.id, { taxa: parseFloat(taxa), fonte, data: dataCot, tipo: "manual", atualizado_em: new Date().toISOString() });
       } else {
-        await base44.entities.Cambio.create({ taxa: parseFloat(taxa), fonte, data: dataCot });
+        await base44.entities.Cambio.create({ taxa: parseFloat(taxa), fonte, data: dataCot, tipo: "manual", atualizado_em: new Date().toISOString() });
       }
       toast.success("Câmbio atualizado — valores em BRL recalculados");
       invalidate([["cambio"], ["despesas"]]);
