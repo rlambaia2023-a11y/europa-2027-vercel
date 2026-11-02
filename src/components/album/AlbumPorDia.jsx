@@ -57,6 +57,8 @@ export default function AlbumPorDia({ entradas, dias, onChange }) {
     try {
       if (!restantes.length && !e.texto) await base44.entities.DiarioEntrada.delete(e.id);
       else await base44.entities.DiarioEntrada.update(e.id, { fotos: restantes });
+      // o registro já foi salvo sem a foto; se o arquivo não sair agora, só sobra espaço ocupado
+      base44.integrations.Core.DeleteFile({ file_uri: uri }).catch(() => {});
       toast.success("Foto removida");
       onChange?.();
     } catch {

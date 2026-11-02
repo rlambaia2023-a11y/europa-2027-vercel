@@ -130,7 +130,10 @@ export default function FormFoto({ dias, viajantes, onSaved }) {
             {fotos.map((uri) => (
               <div key={uri} className="relative aspect-square rounded-lg overflow-hidden bg-secondary">
                 <SignedImage fileUri={uri} className="w-full h-full object-cover" />
-                <button type="button" onClick={() => setFotos((p) => p.filter((u) => u !== uri))}
+                <button type="button" onClick={() => {
+                  setFotos((p) => p.filter((u) => u !== uri));
+                  base44.integrations.Core.DeleteFile({ file_uri: uri }).catch(() => {});
+                }}
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
                   aria-label="Tirar esta foto">
                   <X className="w-3.5 h-3.5" />

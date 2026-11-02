@@ -191,6 +191,13 @@ const integrations = {
     async UploadFile({ file }) {
       return this.UploadPublicFile({ file });
     },
+    // não existe no Base44: apaga do armazenamento um arquivo que saiu do app
+    async DeleteFile({ file_uri }) {
+      const [bucket, ...resto] = String(file_uri || "").split("/");
+      if (bucket !== "privado" || !resto.length) return;
+      const { error } = await supabase.storage.from(bucket).remove([resto.join("/")]);
+      if (error) throw erro(error, 400);
+    },
     async CreateFileSignedUrl({ file_uri, expires_in = 3600 }) {
       const [bucket, ...resto] = String(file_uri || "").split("/");
       const { data, error } = await supabase.storage.from(bucket).createSignedUrl(resto.join("/"), expires_in);
