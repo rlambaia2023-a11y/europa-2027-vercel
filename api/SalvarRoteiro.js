@@ -38,6 +38,7 @@ export default rota(async (req, body) => {
         tempo_visita: txt(a?.tempo_visita, 60),
         categoria: CATEGORIAS.includes(a?.categoria) ? a.categoria : "atração",
         link: linkCompra(a),
+        link_tipo: a?.link_oficial ? (a.link_tipo === "revendedor" ? "revendedor" : "oficial") : "busca",
       }))
       .filter((a) => a.nome);
     dias.push({

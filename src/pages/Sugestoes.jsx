@@ -8,7 +8,7 @@ import { useCidades, useDias, useViajantes, useInvalidate, doRoteiro } from "@/l
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
 import { usePermissao } from "@/lib/usePermissao";
-import LinkCompra, { InfoIngresso, linkDeCompra } from "@/components/LinkCompra";
+import LinkCompra, { InfoIngresso, linkDeCompra, tipoDoLink, avisoDoLink, AvisoLink, ResumoLinks } from "@/components/LinkCompra";
 import { formatarData } from "@/lib/tripData";
 import { cn } from "@/lib/utils";
 
@@ -104,10 +104,12 @@ export default function Sugestoes() {
         lng: s.lng || undefined,
         categoria: "atração",
         link: linkDeCompra(s) || undefined,
+        link_tipo: linkDeCompra(s) ? tipoDoLink(s) : undefined,
       });
       setAdicionadas((p) => ({ ...p, [s.nome]: alvo }));
       invalidate([["atividades", alvo], ["atividades", "all"]]);
       toast.success(`Adicionado a ${formatarData(alvo)}`);
+      if (avisoDoLink(tipoDoLink(s))) toast(`${s.nome}: ${avisoDoLink(tipoDoLink(s))}`, { icon: "⚠️", duration: 6000 });
     } catch {
       toast.error("Erro ao adicionar");
     }
@@ -231,6 +233,8 @@ export default function Sugestoes() {
           <p className="text-sm text-muted-foreground">Nenhuma sugestão disponível.</p>
         </div>
       ) : (
+        <div className="space-y-4">
+        <ResumoLinks lista={sugestoes} />
         <div className="grid sm:grid-cols-2 gap-4">
           {sugestoes.map((s, i) => {
             const adicionadaEm = adicionadas[s.nome];
@@ -279,6 +283,7 @@ export default function Sugestoes() {
                     </button>
                   )}
                   <LinkCompra sugestao={s} />
+                  <AvisoLink tipo={tipoDoLink(s)} className="w-full" />
                   {salvaEm && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-accent font-medium">
                       <BookOpen className="w-3.5 h-3.5" /> No diário · {formatarData(salvaEm)}
@@ -294,6 +299,7 @@ export default function Sugestoes() {
               </motion.div>
             );
           })}
+        </div>
         </div>
       )}
     </div>

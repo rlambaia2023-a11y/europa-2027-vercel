@@ -125,7 +125,7 @@ export async function comLinksOficiais(itens, local) {
       // sem link ou só revendedor: tenta achar o site oficial de verdade no Brave
       const oficial = await linkPeloBrave(it?.nome, it?.cidade || local);
       if (oficial) return { link: oficial, tipo: "oficial" };
-      return link ? { link, tipo: "revendedor" } : { link: "", tipo: "" };
+      return link ? { link, tipo: "revendedor" } : { link: "", tipo: "busca" };
     }));
     lote.forEach((it, j) => {
       saida.push({
@@ -204,12 +204,28 @@ export function ehRevendedor(url) {
   }
 }
 
-// Procura no Brave o site oficial (em inglês os oficiais aparecem melhor) e pula revendedores.
+// "site oficial ingressos" no idioma do país (os sites oficiais costumam estar na língua local)
+function termoLocal(local) {
+  const l = String(local || "").toLowerCase();
+  if (/it[aá]lia|roma|veneza|floren|mil[aã]o/.test(l)) return "sito ufficiale biglietti";
+  if (/montenegro|kotor|perast|budva/.test(l)) return "zvanični sajt ulaznice";
+  if (/cro[aá]cia|bósnia|bosnia|split|dubrovnik|zagreb|plitvice|mostar|hvar/.test(l)) return "službena stranica ulaznice";
+  return "";
+}
+
+// Procura no Brave o site oficial: inglês, depois idioma local, depois português. Pula revendedores.
 async function linkPeloBrave(nome, local) {
-  const res = await buscarBrave(`${nome} ${local || ""} official website tickets`.trim(), 8);
-  if (!res?.length) return "";
-  const oficial = res.find((x) => x.url?.startsWith("https://") && !ehRevendedor(x.url));
-  return oficial?.url || "";
+  const consultas = [
+    `${nome} ${local || ""} official website tickets`,
+    termoLocal(local) && `${nome} ${termoLocal(local)}`,
+    `${nome} ${local || ""} site oficial ingressos`,
+  ].filter(Boolean);
+  for (const q of consultas) {
+    const res = await buscarBrave(q.trim(), 8);
+    const oficial = (res || []).find((x) => x.url?.startsWith("https://") && !ehRevendedor(x.url));
+    if (oficial) return oficial.url;
+  }
+  return "";
 }
 
 // Equivalente ao InvokeLLM do Base44: prompt + arquivos + schema → objeto JSON.

@@ -10,7 +10,7 @@ export const supabase = createClient(
 
 const TABELAS = {
   Dia: ["dias", "data titulo cidade destaque ordem roteiro"],
-  Atividade: ["atividades", "dia_data horario nome endereco tempo_visita deslocamento lat lng link categoria roteiro"],
+  Atividade: ["atividades", "dia_data horario nome endereco tempo_visita deslocamento lat lng link link_tipo categoria roteiro"],
   Cidade: ["cidades", "nome pais lat lng foto descricao ordem"],
   Viajante: ["viajantes", "nome papel iniciais cor user_id cidade_inicio cidade_fim"],
   Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri"],

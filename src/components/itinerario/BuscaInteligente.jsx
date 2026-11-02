@@ -4,7 +4,7 @@ import { Sparkles, Search, Loader2, MapPin, Clock, Plus, Check, ExternalLink, Im
 import { base44 } from "@/api/base44Client";
 import { useDiario, useInvalidate } from "@/lib/useTrip";
 import { formatarData } from "@/lib/tripData";
-import LinkCompra, { InfoIngresso, linkDeCompra } from "@/components/LinkCompra";
+import LinkCompra, { InfoIngresso, linkDeCompra, tipoDoLink, avisoDoLink, AvisoLink, ResumoLinks } from "@/components/LinkCompra";
 import SeletorFotosGaleria from "./SeletorFotosGaleria";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -76,10 +76,12 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
         categoria: "atração",
         roteiro,
         link: linkDeCompra(s) || undefined,
+        link_tipo: linkDeCompra(s) ? tipoDoLink(s) : undefined,
       });
       setAdicionadas((p) => ({ ...p, [s.nome]: diaAlvo }));
       invalidate([["atividades", diaAlvo], ["atividades", "all"]]);
       toast.success(`Adicionado a ${formatarData(diaAlvo)}`);
+      if (avisoDoLink(tipoDoLink(s))) toast(`${s.nome}: ${avisoDoLink(tipoDoLink(s))}`, { icon: "⚠️", duration: 6000 });
     } catch {
       toast.error("Erro ao adicionar");
     }
@@ -185,6 +187,7 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
         <div className="space-y-2 pt-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-semibold text-primary flex-1">{sugestoes.length} sugestão(ões) encontradas</p>
+            <ResumoLinks lista={sugestoes} className="w-full order-last" />
             <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               Adicionar ao dia
               <select
@@ -236,6 +239,7 @@ export default function BuscaInteligente({ roteiro = "principal", dias = [], cid
                       </button>
                     )}
                     <LinkCompra sugestao={s} compacto />
+                    <AvisoLink tipo={tipoDoLink(s)} className="w-full" />
                     {s.lat && s.lng && (
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}`}

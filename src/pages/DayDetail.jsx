@@ -10,6 +10,7 @@ import { buildDayCalendarUrl } from "@/lib/googleCalendar";
 import ChecklistRapido from "@/components/ChecklistRapido";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
+import { AvisoLink } from "@/components/LinkCompra";
 import { usePermissao } from "@/lib/usePermissao";
 
 const CATEGORIAS = [
@@ -179,7 +180,7 @@ export default function DayDetail() {
                   <div className="flex items-center gap-3 mt-2">
                     {a.link && (
                       <a href={a.link} target="_blank" rel="noreferrer" className="text-[11px] text-accent font-medium inline-flex items-center gap-1 hover:underline">
-                        <ExternalLink className="w-3 h-3" /> {a.link.includes("google.com/search") ? "Procurar site oficial" : "Site oficial / comprar"}
+                        <ExternalLink className="w-3 h-3" /> {a.link_tipo === "busca" || a.link.includes("google.com/search") ? "Procurar onde comprar" : a.link_tipo === "revendedor" ? "Comprar (revendedor)" : a.link_tipo === "oficial" ? "Site oficial / comprar" : "Abrir link"}
                       </a>
                     )}
                     {a.lat && a.lng && (
@@ -188,6 +189,7 @@ export default function DayDetail() {
                       </a>
                     )}
                   </div>
+                  <AvisoLink tipo={a.link_tipo} className="mt-2" />
                 </div>
                 {podeEditar && (
                   <button onClick={() => remover(a.id)} className="text-muted-foreground hover:text-destructive self-start p-1" aria-label="Remover">
