@@ -266,6 +266,9 @@ export async function invocarIA({ prompt, schema, fileUrls = [], internet = fals
   const dados = await r.json().catch(() => ({}));
   if (!r.ok) {
     console.error("Gemini", r.status, JSON.stringify(dados).slice(0, 500));
+    if (r.status === 429) {
+      throw new ErroHttp(429, "A cota de uso da IA (Gemini) acabou por enquanto. Tente mais tarde — no plano gratuito ela renova a cada dia.");
+    }
     throw new ErroHttp(502, "A IA não respondeu agora. Tente de novo em instantes.");
   }
   const texto = (dados.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
