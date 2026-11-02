@@ -180,10 +180,10 @@ export async function buscarBrave(q, count = 10) {
 }
 
 // Revendedores e páginas que não vendem nada: só servem se não houver nada melhor.
-const NAO_OFICIAIS = /(google|wikipedia|wikivoyage|tripadvisor|youtube|facebook|instagram|tiktok|reddit|pinterest|getyourguide|viator|civitatis|tiqets|klook|musement|headout|expedia|booking|trip\.com|lonelyplanet)\./i;
+const NAO_OFICIAIS = /(google|wikipedia|wikivoyage|tripadvisor|youtube|facebook|instagram|tiktok|reddit|pinterest|getyourguide|viator|kayak|skyscanner|momondo|rentalcars|autoeurope|discovercars|economybookings|hellotickets|civitatis|tiqets|klook|musement|headout|expedia|booking|trip\.com|lonelyplanet)\./i;
 
 // Blogs de viagem conhecidos (não vendem nada)
-const BLOGS = /(queroviajarmais|viajenaviagem|melhoresdestinos|blog)/i;
+const BLOGS = /(queroviajarmais|viajenaviagem|melhoresdestinos|quantocustaviajar|egpviagens|blog)/i;
 // Imitadores conhecidos das atrações desta viagem (os oficiais são outros domínios)
 const IMITADORES_CONHECIDOS = /(galleriaborgheseroma|colosseumrometickets|colosseo-roma|vaticanmuseumstickets|tickets-split|dubrovnik-walls)\./i;
 // Domínio principal com "tickets"/"ingressos"/"biglietti": site que imita o oficial e revende
