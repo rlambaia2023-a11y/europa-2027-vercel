@@ -3,11 +3,11 @@
 // com a cidade prevista no roteiro para aquele(s) dia(s).
 
 export const TIPOS_RESERVA = [
-  { id: "hotel", label: "Hospedagem", curto: "Hospedagem" },
+  { id: "hotel", label: "Hospedagem (hotel, Airbnb, apartamento)", curto: "Hospedagem" },
   { id: "voo", label: "Voo", curto: "Voos" },
   { id: "transporte", label: "Transporte (trem, ônibus, barco, transfer)", curto: "Transporte" },
-  { id: "carro", label: "Carro", curto: "Carro" },
-  { id: "passeio", label: "Passeio / ingresso", curto: "Passeios" },
+  { id: "carro", label: "Aluguel de carro", curto: "Carro" },
+  { id: "passeio", label: "Passeios, parques e ingressos", curto: "Passeios e parques" },
 ];
 
 const RAIO_KM = 60; // distância máxima entre a reserva e a cidade do roteiro

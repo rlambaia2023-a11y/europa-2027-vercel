@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useDias, useCidades, useAtividades, useInvalidate, doRoteiro, useReservas } from "@/lib/useTrip";
 import { reservasDoDia, periodoTexto, TIPOS_RESERVA } from "@/lib/reservaCondicao";
+import { abrirAnexo } from "@/components/reservas/AnexarGlobal";
 import { AvisoInternetDia } from "@/components/InternetCelular";
 import { formatarData } from "@/lib/tripData";
 import { buildDayCalendarUrl } from "@/lib/googleCalendar";
@@ -238,14 +239,23 @@ function Campo({ label, value, onChange, placeholder, tipo = "text", options }) 
 // Reservas já feitas que caem neste dia (hospedagem da noite, voos, transportes, passeios)
 function ReservasDoDia({ data }) {
   const { data: reservas } = useReservas();
+  const { podeEditar } = usePermissao();
   const lista = reservasDoDia(reservas, data);
-  if (!lista.length) return null;
+  if (!lista.length && !podeEditar) return null;
   return (
     <section className="bg-card rounded-2xl border border-border shadow-soft p-4">
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-heading text-base font-semibold text-primary">Reservas do dia</h2>
-        <Link to="/reservas" className="text-xs text-accent font-medium hover:underline">Ver todas</Link>
+        <div className="flex items-center gap-3">
+          {podeEditar && (
+            <button onClick={abrirAnexo} className="text-xs text-accent font-medium hover:underline">+ Anexar reserva</button>
+          )}
+          <Link to="/reservas" className="text-xs text-accent font-medium hover:underline">Ver todas</Link>
+        </div>
       </div>
+      {!lista.length && (
+        <p className="text-xs text-muted-foreground">Nenhuma reserva para este dia ainda (hotel, Airbnb, carro, transporte, parque ou passeio).</p>
+      )}
       <ul className="space-y-1.5">
         {lista.map((r) => (
           <li key={r.id} className="text-sm flex flex-wrap items-baseline gap-x-2">

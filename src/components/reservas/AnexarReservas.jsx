@@ -11,7 +11,7 @@ import { TIPOS_RESERVA, conferirReserva } from "@/lib/reservaCondicao";
 // Painel para anexar de uma vez as reservas que já foram feitas:
 // cole quantos links quiser (Airbnb, Booking, voos, passeios, trens…) e/ou envie prints e PDFs.
 // O sistema lê cada uma, pega data e local e confere com o roteiro antes de salvar.
-export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onFechar, onSalvo }) {
+export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas, onFechar, onSalvo }) {
   const [textoLinks, setTextoLinks] = useState("");
   const [arquivos, setArquivos] = useState([]);
   const [lendo, setLendo] = useState(false);
@@ -36,7 +36,7 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
   // sem internet a leitura fica para depois: a reserva é salva agora e lida quando a conexão voltar
   const semRede = (e) => !navigator.onLine || e?.status === 0;
   const provisorio = (base, extra = {}) => ({
-    ...base, ...extra, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _pendenteLeitura: true,
+    ...base, ...extra, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _pendenteLeitura: true,
   });
 
   async function lerTudo() {
@@ -55,7 +55,7 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
       setProgresso(`Lendo ${n} de ${total}…`);
       const base = { _id: crypto.randomUUID(), _origem: link, link };
       if (linksExistentes.has(link)) {
-        novos.push({ ...base, _repetido: true, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado" });
+        novos.push({ ...base, _repetido: true, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado" });
         continue;
       }
       if (!navigator.onLine) { novos.push(provisorio(base)); continue; }
@@ -64,7 +64,7 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
         novos.push({ ...base, ...(res.data?.dados || {}), _titulo: res.data?.pagina?.titulo });
       } catch (e) {
         if (semRede(e)) novos.push(provisorio(base));
-        else novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _erro: e?.message || "Não consegui ler" });
+        else novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _erro: e?.message || "Não consegui ler" });
       }
     }
 
@@ -82,10 +82,10 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
           novos.push({ ...base, ...(res.data?.dados || {}), comprovante_uri: file_uri });
         } catch (e) {
           if (semRede(e)) novos.push(provisorio(base, { comprovante_uri: file_uri }));
-          else novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", comprovante_uri: file_uri, _erro: e?.message || "Não consegui ler" });
+          else novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", comprovante_uri: file_uri, _erro: e?.message || "Não consegui ler" });
         }
       } catch {
-        novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _erro: "Falha ao enviar o arquivo" });
+        novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _erro: "Falha ao enviar o arquivo" });
       }
     }
 
@@ -162,7 +162,7 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
         <div>
           <h2 className="font-heading text-lg font-semibold text-primary">Anexar reservas já feitas</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Hospedagem, voos, transportes, carro e passeios. Cole os links (um por linha) e/ou envie prints e PDFs das confirmações.
+            Hotel, Airbnb, apartamento, voo, trem, ônibus, barco, aluguel de carro, parques, passeios e ingressos. Cole os links (um por linha) e/ou envie prints, fotos e PDFs das confirmações. O tipo é reconhecido sozinho.
             Cada reserva só é salva com <strong>data e local</strong>, e o sistema confere com o roteiro.
           </p>
         </div>

@@ -86,7 +86,7 @@ async function lerPagina(link) {
 const SCHEMA = {
   type: "object",
   properties: {
-    tipo: { type: "string", enum: TIPOS, description: "hotel (qualquer hospedagem), voo, transporte (trem, ônibus, barco, ferry, transfer), carro (locação) ou passeio (tour, ingresso, experiência)" },
+    tipo: { type: "string", enum: TIPOS, description: "hotel (qualquer hospedagem: hotel, Airbnb, apartamento, pousada, casa alugada), voo, transporte (trem, ônibus, barco, ferry, transfer), carro (aluguel/locação de carro) ou passeio (tour, ingresso, parque nacional ou de diversão, museu, experiência)" },
     nome: { type: "string", description: "Nome da hospedagem, voo (ex: SSA → FCO), empresa ou passeio" },
     cidade: { type: "string", description: "Cidade do local. Para voo/transporte, o trecho 'Origem → Destino'" },
     endereco: { type: "string", description: "Endereço ou ponto de encontro, se aparecer" },

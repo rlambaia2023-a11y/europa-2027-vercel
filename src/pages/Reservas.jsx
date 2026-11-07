@@ -5,7 +5,8 @@ import {
   TrainFront, Ticket, FolderInput, CalendarDays, MapPin,
 } from "lucide-react";
 import { useReservas, useInvalidate, useDias, useCidades, doRoteiro } from "@/lib/useTrip";
-import AnexarReservas, { Condicao } from "@/components/reservas/AnexarReservas";
+import { Condicao } from "@/components/reservas/AnexarReservas";
+import { abrirAnexo } from "@/components/reservas/AnexarGlobal";
 import { conferirReserva, periodoTexto } from "@/lib/reservaCondicao";
 import { estaPendente } from "@/lib/leituraPendente";
 import { ESTADOS_RESERVA } from "@/lib/tripData";
@@ -15,11 +16,11 @@ import { cn } from "@/lib/utils";
 import { usePermissao } from "@/lib/usePermissao";
 
 const TIPOS = [
-  { id: "hotel", label: "Hospedagem", icon: HotelIcon },
+  { id: "hotel", label: "Hotel e Airbnb", icon: HotelIcon },
   { id: "voo", label: "Voos", icon: Plane },
   { id: "transporte", label: "Transporte", icon: TrainFront },
   { id: "carro", label: "Carro", icon: Car },
-  { id: "passeio", label: "Passeios", icon: Ticket },
+  { id: "passeio", label: "Passeios e parques", icon: Ticket },
 ];
 
 export default function Reservas() {
@@ -30,7 +31,6 @@ export default function Reservas() {
   const [adicionando, setAdicionando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [dadosImportados, setDadosImportados] = useState(null);
-  const [anexando, setAnexando] = useState(false);
   const fileInputRef = useRef(null);
   const { data: todosDias } = useDias();
   const dias = doRoteiro(todosDias);
@@ -148,7 +148,7 @@ export default function Reservas() {
 
       {podeEditar && <div className="flex flex-wrap justify-end gap-2">
         <button
-          onClick={() => { setAnexando((v) => !v); setAdicionando(false); }}
+          onClick={() => { setAdicionando(false); abrirAnexo(); }}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
         >
           <FolderInput className="w-4 h-4" /> Anexar reservas feitas
@@ -169,24 +169,13 @@ export default function Reservas() {
           {importando ? "Lendo print…" : "Importar print"}
         </button>
         <button
-          onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); setAnexando(false); }}
+          onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); }}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:opacity-90"
         >
           {adicionando ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {adicionando ? "Cancelar" : "Nova reserva"}
         </button>
       </div>}
-
-      {anexando && podeEditar && (
-        <AnexarReservas
-          tipoAtual={aba}
-          dias={dias}
-          cidades={cidades}
-          reservas={reservas}
-          onFechar={() => setAnexando(false)}
-          onSalvo={() => invalidate([["reservas"]])}
-        />
-      )}
 
       {pendentes > 0 && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-[12px] text-foreground/80">

@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import OfflineBanner from "@/components/OfflineBanner";
 import { usePermissao } from "@/lib/usePermissao";
+import AnexarGlobal from "@/components/reservas/AnexarGlobal";
 
 const NAV = [
   { to: "/", label: "Início", icon: Compass, end: true },
@@ -147,6 +148,9 @@ export default function Layout() {
           </div>
         </footer>
       </main>
+
+      {/* Anexar reservas: disponível em todas as telas */}
+      <AnexarGlobal />
 
       {/* Bottom nav mobile */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border">
