@@ -184,8 +184,8 @@ function FormEntrada({ dias, viajantes, diaPadrao, onDone }) {
         </label>
         <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-lg p-4 cursor-pointer hover:border-accent text-muted-foreground">
           <FileUp className="w-5 h-5" />
-          <span className="text-xs">Adicionar comprovantes (privados)</span>
-          <input type="file" multiple className="hidden" onChange={(e) => uploadArquivos(e.target.files, setComprovantes)} />
+          <span className="text-xs">Adicionar comprovantes: fotos, prints ou PDFs (privados)</span>
+          <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => uploadArquivos(e.target.files, setComprovantes)} />
           {comprovantes.length > 0 && <span className="text-[11px] text-accent font-medium">{comprovantes.length} anexo(s)</span>}
         </label>
       </div>

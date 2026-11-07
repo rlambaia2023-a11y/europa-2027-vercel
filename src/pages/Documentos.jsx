@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import { usePermissao } from "@/lib/usePermissao";
 import { cn } from "@/lib/utils";
 import InternetCelular from "@/components/InternetCelular";
+import Anexos from "@/components/Anexos";
 
 const CAT_ICON = {
   Documentos: FileText,
@@ -114,7 +115,7 @@ export default function Documentos() {
                 <div className="space-y-2">
                   {itensCat.map((item, i) => (
                     <motion.div key={item.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                      className="bg-card rounded-xl border border-border shadow-soft p-3.5 flex items-center gap-3">
+                      className="bg-card rounded-xl border border-border shadow-soft p-3.5 flex flex-wrap items-center gap-3">
                       <button onClick={() => toggle(item)} className={cn("w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
                         item.concluido ? "bg-green-600 border-green-600 text-white" : "border-border hover:border-accent")}>
                         {item.concluido ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3 opacity-0" />}
@@ -125,6 +126,13 @@ export default function Documentos() {
                       )}
                       {item.observacao && <span className="text-[11px] text-muted-foreground hidden sm:block">{item.observacao}</span>}
                       {podeMexerNoRegistro(item) && <button onClick={() => remover(item.id)} className="text-muted-foreground hover:text-destructive p-1" aria-label="Remover"><Trash2 className="w-4 h-4" /></button>}
+                      <Anexos
+                        className="basis-full pl-8"
+                        uris={item.anexos}
+                        podeEditar={podeMexerNoRegistro(item)}
+                        rotulo="Anexar cópia (foto, print ou PDF)"
+                        onSalvar={async (lista) => { await base44.entities.ChecklistItem.update(item.id, { anexos: lista }); invalidate([["checklist"]]); }}
+                      />
                     </motion.div>
                   ))}
                 </div>

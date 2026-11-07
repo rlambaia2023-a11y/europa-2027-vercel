@@ -7,6 +7,7 @@ import {
 import { useDias, useCidades, useAtividades, useInvalidate, doRoteiro, useReservas } from "@/lib/useTrip";
 import { reservasDoDia, periodoTexto, TIPOS_RESERVA } from "@/lib/reservaCondicao";
 import { abrirAnexo } from "@/components/reservas/AnexarGlobal";
+import Anexos from "@/components/Anexos";
 import { AvisoInternetDia } from "@/components/InternetCelular";
 import { formatarData } from "@/lib/tripData";
 import { buildDayCalendarUrl } from "@/lib/googleCalendar";
@@ -199,6 +200,13 @@ export default function DayDetail() {
                     )}
                   </div>
                   <AvisoLink tipo={a.link_tipo} className="mt-2" />
+                  <Anexos
+                    className="mt-2"
+                    uris={a.anexos}
+                    podeEditar={podeEditar}
+                    rotulo="Anexar ingresso, foto ou PDF"
+                    onSalvar={async (lista) => { await base44.entities.Atividade.update(a.id, { anexos: lista }); invalidate([["atividades", diaData]]); }}
+                  />
                 </div>
                 {podeEditar && (
                   <button onClick={() => remover(a.id)} className="text-muted-foreground hover:text-destructive self-start p-1" aria-label="Remover">

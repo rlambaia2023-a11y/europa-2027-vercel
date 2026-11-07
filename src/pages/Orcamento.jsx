@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import Anexos, { ACEITA_ANEXO } from "@/components/Anexos";
 import { motion } from "framer-motion";
 import {
   Wallet, Plus, Trash2, X, Download, FileText, CheckCircle2, Clock, ArrowRightLeft,
@@ -68,7 +69,7 @@ export default function Orcamento() {
     if (!file) return;
     setImportando(true);
     try {
-      const compacto = await comprimirImagem(file).catch(() => file);
+      const compacto = file.type.startsWith("image/") ? await comprimirImagem(file).catch(() => file) : file;
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: compacto });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
       const res = await base44.functions.invoke("ImportarDespesaPrint", { file_url: signed_url });
@@ -211,7 +212,7 @@ export default function Orcamento() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={ACEITA_ANEXO}
             className="hidden"
             onChange={(e) => handleImportPrint(e.target.files?.[0])}
           />
@@ -221,7 +222,7 @@ export default function Orcamento() {
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10 disabled:opacity-50"
           >
             {importando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-            {importando ? "Lendo print…" : "Importar print"}
+            {importando ? "Lendo…" : "Importar print/PDF"}
           </button>
           <button onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); setEditandoDespesa(null); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:opacity-90">
             {adicionando ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />} {adicionando ? "Cancelar" : "Nova despesa"}
@@ -253,6 +254,13 @@ export default function Orcamento() {
                   {d.viajante_nome && <span>· {d.viajante_nome}</span>}
                   {d.coletiva && <span>· coletiva</span>}
                 </div>
+                <Anexos
+                  className="mt-1.5"
+                  uris={d.anexos}
+                  podeEditar={podeEditar}
+                  rotulo="Anexar nota/recibo"
+                  onSalvar={async (lista) => { await base44.entities.Despesa.update(d.id, { anexos: lista }); invalidate([["despesas"]]); }}
+                />
               </div>
               <div className="text-right shrink-0">
                 <p className="font-medium text-sm">{d.moeda === "EUR" ? "€" : "R$"} {d.valor.toLocaleString("pt-BR")}</p>

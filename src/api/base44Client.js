@@ -14,13 +14,13 @@ export const supabase = createClient(
 
 const TABELAS = {
   Dia: ["dias", "data titulo cidade destaque ordem roteiro"],
-  Atividade: ["atividades", "dia_data horario nome endereco tempo_visita deslocamento lat lng link link_tipo categoria roteiro"],
+  Atividade: ["atividades", "dia_data horario nome endereco tempo_visita deslocamento lat lng link link_tipo categoria roteiro anexos"],
   Cidade: ["cidades", "nome pais lat lng foto descricao ordem"],
   Viajante: ["viajantes", "nome papel iniciais cor user_id cidade_inicio cidade_fim"],
-  Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri data_inicio data_fim horario endereco lat lng"],
-  Despesa: ["despesas", "descricao categoria valor moeda paga coletiva viajante_nome data comprovante_uri"],
+  Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri data_inicio data_fim horario endereco lat lng anexos"],
+  Despesa: ["despesas", "descricao categoria valor moeda paga coletiva viajante_nome data comprovante_uri anexos"],
   Cambio: ["cambio", "taxa data fonte tipo atualizado_em"],
-  ChecklistItem: ["checklist_itens", "item categoria viajante_nome concluido observacao"],
+  ChecklistItem: ["checklist_itens", "item categoria viajante_nome concluido observacao anexos"],
   DiarioEntrada: ["diario_entradas", "dia_data viajante_nome texto fotos comprovantes local lat lng"],
 };
 
@@ -48,7 +48,7 @@ function limpar(campos, obj) {
 // vão para o texto de "detalhes" até a coluna existir.
 function semColuna(tabela, dados, coluna) {
   const { [coluna]: valor, ...resto } = dados;
-  if (tabela === "reservas" && valor != null && valor !== "" && !["lat", "lng"].includes(coluna)) {
+  if (tabela === "reservas" && valor != null && valor !== "" && !["lat", "lng", "anexos"].includes(coluna)) {
     const rotulos = { data_inicio: "Início", data_fim: "Fim", horario: "Horário", endereco: "Endereço" };
     const linha = `${rotulos[coluna] || coluna}: ${valor}`;
     if (!String(resto.detalhes || "").includes(linha)) resto.detalhes = [resto.detalhes, linha].filter(Boolean).join("\n");

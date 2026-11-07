@@ -9,6 +9,7 @@ import { Condicao } from "@/components/reservas/AnexarReservas";
 import { abrirAnexo } from "@/components/reservas/AnexarGlobal";
 import { conferirReserva, periodoTexto } from "@/lib/reservaCondicao";
 import { estaPendente } from "@/lib/leituraPendente";
+import Anexos, { ACEITA_ANEXO } from "@/components/Anexos";
 import { ESTADOS_RESERVA } from "@/lib/tripData";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
@@ -77,7 +78,7 @@ export default function Reservas() {
     if (!file) return;
     setImportando(true);
     try {
-      const compacto = await comprimirImagem(file).catch(() => file);
+      const compacto = file.type.startsWith("image/") ? await comprimirImagem(file).catch(() => file) : file;
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: compacto });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
       const roteiro = (dias || []).map((d) => ({ data: d.data, cidade: d.cidade }));
@@ -156,7 +157,7 @@ export default function Reservas() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept={ACEITA_ANEXO}
           className="hidden"
           onChange={(e) => handleImportPrint(e.target.files?.[0])}
         />
@@ -166,7 +167,7 @@ export default function Reservas() {
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10 disabled:opacity-50"
         >
           {importando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-          {importando ? "Lendo print…" : "Importar print"}
+          {importando ? "Lendo…" : "Importar print/PDF"}
         </button>
         <button
           onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); }}
@@ -271,6 +272,14 @@ export default function Reservas() {
                   <Paperclip className="w-3 h-3" /> Ver comprovante
                 </button>
               )}
+
+              <Anexos
+                className="mt-2"
+                uris={r.anexos}
+                podeEditar={podeEditar}
+                rotulo="Anexar voucher, foto ou PDF"
+                onSalvar={async (lista) => { await base44.entities.Reserva.update(r.id, { anexos: lista }); invalidate([["reservas"]]); }}
+              />
 
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <select
