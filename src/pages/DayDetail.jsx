@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import {
   MapPin, Clock, ArrowLeft, Plus, ExternalLink, Trash2, Navigation, Car, Utensils, Camera, BedDouble, Map as MapIcon, CalendarPlus,
 } from "lucide-react";
-import { useDias, useCidades, useAtividades, useInvalidate, doRoteiro } from "@/lib/useTrip";
+import { useDias, useCidades, useAtividades, useInvalidate, doRoteiro, useReservas } from "@/lib/useTrip";
+import { reservasDoDia, periodoTexto, TIPOS_RESERVA } from "@/lib/reservaCondicao";
 import { AvisoInternetDia } from "@/components/InternetCelular";
 import { formatarData } from "@/lib/tripData";
 import { buildDayCalendarUrl } from "@/lib/googleCalendar";
@@ -114,6 +115,8 @@ export default function DayDetail() {
       </header>
 
       <AvisoInternetDia pais={paisDoDia} cidade={dia?.cidade} />
+
+      <ReservasDoDia data={diaData} />
 
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg font-semibold text-primary">Atividades do dia</h2>
@@ -230,5 +233,30 @@ function Campo({ label, value, onChange, placeholder, tipo = "text", options }) 
         />
       )}
     </label>
+  );
+}
+// Reservas já feitas que caem neste dia (hospedagem da noite, voos, transportes, passeios)
+function ReservasDoDia({ data }) {
+  const { data: reservas } = useReservas();
+  const lista = reservasDoDia(reservas, data);
+  if (!lista.length) return null;
+  return (
+    <section className="bg-card rounded-2xl border border-border shadow-soft p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="font-heading text-base font-semibold text-primary">Reservas do dia</h2>
+        <Link to="/reservas" className="text-xs text-accent font-medium hover:underline">Ver todas</Link>
+      </div>
+      <ul className="space-y-1.5">
+        {lista.map((r) => (
+          <li key={r.id} className="text-sm flex flex-wrap items-baseline gap-x-2">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {TIPOS_RESERVA.find((t) => t.id === r.tipo)?.curto || r.tipo}
+            </span>
+            <span className="font-medium">{r.nome}</span>
+            <span className="text-xs text-muted-foreground">{[r.cidade, periodoTexto(r)].filter(Boolean).join(" · ")}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

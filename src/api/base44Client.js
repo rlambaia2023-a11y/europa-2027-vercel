@@ -17,7 +17,7 @@ const TABELAS = {
   Atividade: ["atividades", "dia_data horario nome endereco tempo_visita deslocamento lat lng link link_tipo categoria roteiro"],
   Cidade: ["cidades", "nome pais lat lng foto descricao ordem"],
   Viajante: ["viajantes", "nome papel iniciais cor user_id cidade_inicio cidade_fim"],
-  Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri"],
+  Reserva: ["reservas", "tipo nome cidade estado preco moeda nota data_cotacao fonte link cancelamento detalhes comprovante_uri data_inicio data_fim horario endereco lat lng"],
   Despesa: ["despesas", "descricao categoria valor moeda paga coletiva viajante_nome data comprovante_uri"],
   Cambio: ["cambio", "taxa data fonte tipo atualizado_em"],
   ChecklistItem: ["checklist_itens", "item categoria viajante_nome concluido observacao"],
@@ -44,6 +44,18 @@ function limpar(campos, obj) {
   return saida;
 }
 
+// Tira uma coluna que o banco ainda não tem. Nas reservas, data e local não se perdem:
+// vão para o texto de "detalhes" até a coluna existir.
+function semColuna(tabela, dados, coluna) {
+  const { [coluna]: valor, ...resto } = dados;
+  if (tabela === "reservas" && valor != null && valor !== "" && !["lat", "lng"].includes(coluna)) {
+    const rotulos = { data_inicio: "Início", data_fim: "Fim", horario: "Horário", endereco: "Endereço" };
+    const linha = `${rotulos[coluna] || coluna}: ${valor}`;
+    if (!String(resto.detalhes || "").includes(linha)) resto.detalhes = [resto.detalhes, linha].filter(Boolean).join("\n");
+  }
+  return resto;
+}
+
 // Sem internet (ou com alterações ainda na fila), escreve no aparelho e enfileira;
 // com internet, vai direto ao servidor. Leituras sempre respondem pelo espelho local,
 // atualizado com o servidor quando há conexão.
@@ -57,6 +69,21 @@ function entidade(nome) {
     const { data, error } = await consulta;
     if (error) throw erro(error, status);
     return data;
+  }
+
+  // Se o banco ainda não tiver uma coluna nova (ex.: datas da reserva), grava sem ela
+  // em vez de falhar, e avisa no console. Assim o app nunca trava por causa disso.
+  async function gravar(montar, dados) {
+    let atual = { ...dados };
+    for (let i = 0; i < 8; i++) {
+      const { data, error } = await montar(atual);
+      if (!error) return data;
+      const coluna = error.code === "PGRST204" && /'([^']+)' column/.exec(error.message || "")?.[1];
+      if (!coluna || !(coluna in atual)) throw erro(error);
+      console.warn(`[${tabela}] coluna "${coluna}" ainda não existe no banco; gravando sem ela.`);
+      atual = semColuna(tabela, atual, coluna);
+    }
+    throw erro(new Error("Não foi possível gravar."));
   }
 
   // tenta o servidor; se a rede falhar, faz a versão offline
@@ -115,7 +142,7 @@ function entidade(nome) {
       const id = crypto.randomUUID();
       return comRede(
         async () => {
-          const linha = await rodar(supabase.from(tabela).insert({ ...dados, id }).select().single());
+          const linha = await gravar((d) => supabase.from(tabela).insert({ ...d, id }).select().single(), dados);
           aplicarLocal(tabela, linha, "create");
           return linha;
         },
@@ -135,7 +162,7 @@ function entidade(nome) {
       const dados = limpar(campos, patch);
       return comRede(
         async () => {
-          const linha = await rodar(supabase.from(tabela).update(dados).eq("id", id).select().single());
+          const linha = await gravar((d) => supabase.from(tabela).update(d).eq("id", id).select().single(), dados);
           aplicarLocal(tabela, linha, "update");
           return linha;
         },

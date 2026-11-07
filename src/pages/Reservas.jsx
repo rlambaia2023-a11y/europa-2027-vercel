@@ -2,8 +2,11 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Hotel as HotelIcon, Plane, Car, Plus, ExternalLink, Star, Trash2, X, ImagePlus, Loader2, Paperclip,
+  TrainFront, Ticket, FolderInput, CalendarDays, MapPin,
 } from "lucide-react";
-import { useReservas, useInvalidate } from "@/lib/useTrip";
+import { useReservas, useInvalidate, useDias, useCidades, doRoteiro } from "@/lib/useTrip";
+import AnexarReservas, { Condicao } from "@/components/reservas/AnexarReservas";
+import { conferirReserva, periodoTexto } from "@/lib/reservaCondicao";
 import { ESTADOS_RESERVA } from "@/lib/tripData";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
@@ -11,9 +14,11 @@ import { cn } from "@/lib/utils";
 import { usePermissao } from "@/lib/usePermissao";
 
 const TIPOS = [
-  { id: "hotel", label: "Hotéis", icon: HotelIcon },
+  { id: "hotel", label: "Hospedagem", icon: HotelIcon },
   { id: "voo", label: "Voos", icon: Plane },
+  { id: "transporte", label: "Transporte", icon: TrainFront },
   { id: "carro", label: "Carro", icon: Car },
+  { id: "passeio", label: "Passeios", icon: Ticket },
 ];
 
 export default function Reservas() {
@@ -24,9 +29,18 @@ export default function Reservas() {
   const [adicionando, setAdicionando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [dadosImportados, setDadosImportados] = useState(null);
+  const [anexando, setAnexando] = useState(false);
   const fileInputRef = useRef(null);
+  const { data: todosDias } = useDias();
+  const dias = doRoteiro(todosDias);
+  const { data: cidades } = useCidades();
+  const contexto = { dias, cidades, reservas };
 
-  const lista = (reservas || []).filter((r) => r.tipo === aba);
+  // em ordem de data (sem data por último), para enxergar a viagem na sequência
+  const lista = (reservas || [])
+    .filter((r) => r.tipo === aba)
+    .sort((a, b) => (a.data_inicio || "9999").localeCompare(b.data_inicio || "9999"));
+  const pendentes = (reservas || []).filter((r) => r.estado !== "cancelado" && conferirReserva(r, contexto).nivel !== "ok").length;
 
   async function comprimirImagem(file, maxDim = 1600) {
     return new Promise((resolve, reject) => {
@@ -65,8 +79,10 @@ export default function Reservas() {
       const compacto = await comprimirImagem(file).catch(() => file);
       const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: compacto });
       const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
-      const res = await base44.functions.invoke("ImportarReservaPrint", { file_url: signed_url, tipo: aba });
+      const roteiro = (dias || []).map((d) => ({ data: d.data, cidade: d.cidade }));
+      const res = await base44.functions.invoke("LerReserva", { file_url: signed_url, tipo: aba, roteiro });
       const dados = res.data?.dados || res.dados || {};
+      if (dados.tipo && dados.tipo !== aba) setAba(dados.tipo);
       setDadosImportados({ ...dados, comprovante_uri: file_uri });
       setAdicionando(true);
       toast.success("Dados extraídos do print! Revise e salve.");
@@ -103,9 +119,9 @@ export default function Reservas() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] tracking-[0.2em] uppercase text-accent font-medium">Reservas</p>
-          <h1 className="font-heading text-3xl font-semibold text-primary mt-1">Hotéis, voos e carro</h1>
+          <h1 className="font-heading text-3xl font-semibold text-primary mt-1">Hospedagem, voos, transporte e passeios</h1>
           <p className="text-sm text-muted-foreground mt-1.5 max-w-2xl">
-            Compare opções e acompanhe o estado de cada reserva. Os preços são <strong>cotações</strong>, nunca tarifas confirmadas.
+            Cada reserva tem data e local, conferidos com o roteiro. Os preços são <strong>cotações</strong>, nunca tarifas confirmadas.
           </p>
         </div>
       </header>
@@ -129,7 +145,13 @@ export default function Reservas() {
         ))}
       </div>
 
-      {podeEditar && <div className="flex justify-end gap-2">
+      {podeEditar && <div className="flex flex-wrap justify-end gap-2">
+        <button
+          onClick={() => { setAnexando((v) => !v); setAdicionando(false); }}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+        >
+          <FolderInput className="w-4 h-4" /> Anexar reservas feitas
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -146,7 +168,7 @@ export default function Reservas() {
           {importando ? "Lendo print…" : "Importar print"}
         </button>
         <button
-          onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); }}
+          onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); setAnexando(false); }}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:opacity-90"
         >
           {adicionando ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -154,9 +176,28 @@ export default function Reservas() {
         </button>
       </div>}
 
+      {anexando && podeEditar && (
+        <AnexarReservas
+          tipoAtual={aba}
+          dias={dias}
+          cidades={cidades}
+          reservas={reservas}
+          onFechar={() => setAnexando(false)}
+          onSalvo={() => invalidate([["reservas"]])}
+        />
+      )}
+
+      {pendentes > 0 && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-[12px] text-foreground/80">
+          {pendentes} reserva(s) sem data/local ou fora do roteiro. Veja o aviso em cada uma.
+        </div>
+      )}
+
       {adicionando && podeEditar && (
         <FormReserva
-          tipo={aba}
+          key={dadosImportados ? "importado" : aba}
+          tipo={dadosImportados?.tipo || aba}
+          contexto={contexto}
           initial={dadosImportados}
           onDone={() => { setAdicionando(false); setDadosImportados(null); invalidate([["reservas"]]); }}
         />
@@ -184,10 +225,23 @@ export default function Reservas() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <h3 className="font-medium text-foreground leading-tight">{r.nome}</h3>
-                  {r.cidade && <p className="text-xs text-muted-foreground mt-0.5">{r.cidade}</p>}
+                  {(r.cidade || r.endereco) && (
+                    <p className="text-xs text-muted-foreground mt-0.5 inline-flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" /> {r.cidade || r.endereco}
+                    </p>
+                  )}
+                  {r.data_inicio && (
+                    <p className="text-xs text-foreground/80 mt-0.5 flex items-center gap-1">
+                      <CalendarDays className="w-3 h-3 shrink-0" /> {periodoTexto(r)}
+                    </p>
+                  )}
                 </div>
                 <EstadoBadge estado={r.estado} />
               </div>
+              {r.estado !== "cancelado" && (
+                <div className="mt-2"><Condicao cond={conferirReserva(r, contexto)} compacto /></div>
+              )}
+              {podeEditar && <CompletarDataLocal reserva={r} onSalvo={() => invalidate([["reservas"]])} />}
 
               <div className="flex items-baseline gap-2 mt-3">
                 <span className="font-heading text-2xl font-semibold text-primary">
@@ -235,7 +289,7 @@ export default function Reservas() {
                 </select>
                 {r.link && (
                   <a href={r.link} target="_blank" rel="noreferrer" className="text-xs text-accent font-medium inline-flex items-center gap-1 hover:underline">
-                    <ExternalLink className="w-3 h-3" /> Reservar
+                    <ExternalLink className="w-3 h-3" /> Abrir reserva
                   </a>
                 )}
                 {podeAdministrar && (
@@ -252,6 +306,56 @@ export default function Reservas() {
   );
 }
 
+// Ajuste rápido de data e local direto no cartão (para reservas antigas ou lidas sem data)
+function CompletarDataLocal({ reserva: r, onSalvo }) {
+  const [aberto, setAberto] = useState(false);
+  const [f, setF] = useState({ data_inicio: r.data_inicio || "", data_fim: r.data_fim || "", cidade: r.cidade || "", horario: r.horario || "" });
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    if (!f.data_inicio || !f.cidade.trim()) return toast.error("Informe a data e o local.");
+    setSalvando(true);
+    try {
+      await base44.entities.Reserva.update(r.id, {
+        ...f,
+        data_fim: f.data_fim || null,
+        ...(f.cidade !== r.cidade ? { lat: null, lng: null } : {}),
+      });
+      toast.success("Data e local salvos");
+      setAberto(false);
+      onSalvo();
+    } catch {
+      toast.error("Erro ao salvar");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (!aberto) {
+    return (
+      <button onClick={() => setAberto(true)} className="mt-2 self-start inline-flex items-center gap-1 text-xs text-accent font-medium hover:underline">
+        <CalendarDays className="w-3 h-3" /> {r.data_inicio ? "Ajustar data e local" : "Completar data e local"}
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 rounded-lg bg-secondary/50 p-2.5 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <In label={r.tipo === "hotel" ? "Check-in" : "Data"} value={f.data_inicio} onChange={(v) => setF({ ...f, data_inicio: v })} tipo="date" />
+        <In label={r.tipo === "hotel" ? "Check-out" : "Até"} value={f.data_fim} onChange={(v) => setF({ ...f, data_fim: v })} tipo="date" />
+        <In label={r.tipo === "voo" || r.tipo === "transporte" ? "Trecho" : "Cidade"} value={f.cidade} onChange={(v) => setF({ ...f, cidade: v })} />
+        <In label="Horário" value={f.horario} onChange={(v) => setF({ ...f, horario: v })} />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={salvar} disabled={salvando} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50">
+          {salvando ? "Salvando…" : "Salvar"}
+        </button>
+        <button onClick={() => setAberto(false)} className="px-3 py-1.5 rounded-lg border border-border text-xs">Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 function EstadoBadge({ estado }) {
   const e = ESTADOS_RESERVA.find((x) => x.id === estado) || ESTADOS_RESERVA[0];
   return (
@@ -261,10 +365,11 @@ function EstadoBadge({ estado }) {
   );
 }
 
-function FormReserva({ tipo, initial, onDone }) {
+function FormReserva({ tipo, initial, onDone, contexto }) {
   const [form, setForm] = useState(() => ({
     nome: "", cidade: "", estado: "reservado", preco: "", moeda: "EUR",
     nota: "", data_cotacao: new Date().toISOString().slice(0, 10), fonte: "", link: "", cancelamento: "", detalhes: "",
+    data_inicio: "", data_fim: "", horario: "", endereco: "",
     ...(initial || {}),
     preco: initial?.preco != null ? String(initial.preco) : "",
     nota: initial?.nota != null ? String(initial.nota) : "",
@@ -274,11 +379,21 @@ function FormReserva({ tipo, initial, onDone }) {
   async function salvar(e) {
     e.preventDefault();
     if (!form.nome.trim()) return;
+    if (!form.data_inicio || (!form.cidade.trim() && !form.endereco.trim())) {
+      toast.error("Informe a data e o local da reserva.");
+      return;
+    }
     try {
       await base44.entities.Reserva.create({
         tipo,
         nome: form.nome,
         cidade: form.cidade,
+        endereco: form.endereco,
+        lat: initial?.lat != null && form.cidade === initial?.cidade ? initial.lat : undefined,
+        lng: initial?.lng != null && form.cidade === initial?.cidade ? initial.lng : undefined,
+        data_inicio: form.data_inicio,
+        data_fim: form.data_fim || undefined,
+        horario: form.horario,
         estado: form.estado,
         preco: form.preco ? parseFloat(form.preco) : undefined,
         moeda: form.moeda,
@@ -302,8 +417,15 @@ function FormReserva({ tipo, initial, onDone }) {
       onSubmit={salvar} className="bg-card rounded-2xl border border-border shadow-soft p-4 space-y-3">
       <div className="grid sm:grid-cols-2 gap-3">
         <In label="Nome" value={form.nome} onChange={(v) => setForm({ ...form, nome: v })} placeholder={tipo === "voo" ? "SSA → FCO" : "Hotel…"} />
-        <In label="Cidade / trecho" value={form.cidade} onChange={(v) => setForm({ ...form, cidade: v })} />
+        <In label={tipo === "voo" || tipo === "transporte" ? "Trecho (origem → destino)" : "Cidade"} value={form.cidade} onChange={(v) => setForm({ ...form, cidade: v })} />
       </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <In label={tipo === "hotel" ? "Check-in" : "Data"} value={form.data_inicio} onChange={(v) => setForm({ ...form, data_inicio: v })} tipo="date" />
+        <In label={tipo === "hotel" ? "Check-out" : "Até (opcional)"} value={form.data_fim} onChange={(v) => setForm({ ...form, data_fim: v })} tipo="date" />
+        <In label="Horário" value={form.horario} onChange={(v) => setForm({ ...form, horario: v })} placeholder={tipo === "hotel" ? "check-in 15:00" : "08:40"} />
+        <In label="Endereço / encontro" value={form.endereco} onChange={(v) => setForm({ ...form, endereco: v })} />
+      </div>
+      <Condicao cond={conferirReserva({ ...form, tipo, lat: form.cidade === initial?.cidade ? initial?.lat : null, lng: form.cidade === initial?.cidade ? initial?.lng : null }, contexto)} />
       <div className="grid sm:grid-cols-3 gap-3">
         <Sel label="Estado" value={form.estado} onChange={(v) => setForm({ ...form, estado: v })} options={ESTADOS_RESERVA.map((e) => ({ value: e.id, label: e.label }))} />
         <In label="Preço (cotação)" value={form.preco} onChange={(v) => setForm({ ...form, preco: v })} placeholder="0" tipo="number" />
