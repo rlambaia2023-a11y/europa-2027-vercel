@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Hotel as HotelIcon, Plane, Car, Plus, ExternalLink, Star, Trash2, X, ImagePlus, Paperclip,
-  TrainFront, Ticket, FolderInput, CalendarDays, MapPin, Camera,
+  TrainFront, Ticket, FolderInput, CalendarDays, MapPin, Camera, FileText,
 } from "lucide-react";
 import { useReservas, useInvalidate, useDias, useCidades, doRoteiro } from "@/lib/useTrip";
 import { Condicao } from "@/components/reservas/AnexarReservas";
@@ -33,6 +33,7 @@ export default function Reservas() {
   const [dadosImportados, setDadosImportados] = useState(null);
   const fileInputRef = useRef(null);
   const cameraRef = useRef(null);
+  const pdfRef = useRef(null);
   const { data: todosDias } = useDias();
   const dias = doRoteiro(todosDias);
   const { data: cidades } = useCidades();
@@ -103,6 +104,24 @@ export default function Reservas() {
           <FolderInput className="w-4 h-4" /> Anexar reservas feitas
         </button>
         <input
+          ref={pdfRef}
+          type="file"
+          multiple
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const l = Array.from(e.target.files || []).filter((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+            e.target.value = "";
+            if (l.length) abrirAnexo(l);
+          }}
+        />
+        <button
+          onClick={() => pdfRef.current?.click()}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-semibold hover:opacity-90"
+        >
+          <FileText className="w-4 h-4" /> Ler PDF da reserva
+        </button>
+        <input
           ref={fileInputRef}
           type="file"
           multiple
@@ -122,7 +141,7 @@ export default function Reservas() {
           onClick={() => fileInputRef.current?.click()}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10"
         >
-          <ImagePlus className="w-4 h-4" /> Importar PDF/foto
+          <ImagePlus className="w-4 h-4" /> Importar foto/print
         </button>
         <button
           onClick={() => cameraRef.current?.click()}
