@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Link2, Paperclip, Loader2, X, Check, AlertTriangle, CalendarDays, Trash2, Save } from "lucide-react";
+import { Link2, Paperclip, Loader2, X, Check, AlertTriangle, CalendarDays, Trash2, Save, WifiOff } from "lucide-react";
+import { marcarParaLer, NOME_PROVISORIO } from "@/lib/leituraPendente";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,12 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
     return comprimirImagem(file).catch(() => file);
   }
 
+  // sem internet a leitura fica para depois: a reserva é salva agora e lida quando a conexão voltar
+  const semRede = (e) => !navigator.onLine || e?.status === 0;
+  const provisorio = (base, extra = {}) => ({
+    ...base, ...extra, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _pendenteLeitura: true,
+  });
+
   async function lerTudo() {
     const links = extrairLinks(textoLinks);
     if (!links.length && !arquivos.length) {
@@ -51,11 +58,13 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
         novos.push({ ...base, _repetido: true, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado" });
         continue;
       }
+      if (!navigator.onLine) { novos.push(provisorio(base)); continue; }
       try {
         const res = await base44.functions.invoke("LerReserva", { link, tipo: tipoAtual, roteiro });
         novos.push({ ...base, ...(res.data?.dados || {}), _titulo: res.data?.pagina?.titulo });
       } catch (e) {
-        novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _erro: e?.message || "Não consegui ler" });
+        if (semRede(e)) novos.push(provisorio(base));
+        else novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _erro: e?.message || "Não consegui ler" });
       }
     }
 
@@ -66,12 +75,14 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
       try {
         const pronto = await prepararArquivo(file);
         const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: pronto });
+        if (!navigator.onLine) { novos.push(provisorio(base, { comprovante_uri: file_uri })); continue; }
         const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
         try {
           const res = await base44.functions.invoke("LerReserva", { file_url: signed_url, tipo: tipoAtual, roteiro });
           novos.push({ ...base, ...(res.data?.dados || {}), comprovante_uri: file_uri });
         } catch (e) {
-          novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", comprovante_uri: file_uri, _erro: e?.message || "Não consegui ler" });
+          if (semRede(e)) novos.push(provisorio(base, { comprovante_uri: file_uri }));
+          else novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", comprovante_uri: file_uri, _erro: e?.message || "Não consegui ler" });
         }
       } catch {
         novos.push({ ...base, tipo: tipoAtual, nome: "", cidade: "", estado: "reservado", _erro: "Falha ao enviar o arquivo" });
@@ -84,7 +95,11 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
     if (inputRef.current) inputRef.current.value = "";
     setLendo(false);
     setProgresso("");
-    const semData = novos.filter((x) => !x._repetido && !x.data_inicio).length;
+    const semData = novos.filter((x) => !x._repetido && !x._pendenteLeitura && !x.data_inicio).length;
+    if (novos.some((x) => x._pendenteLeitura)) {
+      toast("Sem internet: dá para salvar agora. A leitura de data e local acontece quando a conexão voltar.", { icon: "📶" });
+      return;
+    }
     toast.success(semData ? `${novos.length} lida(s). ${semData} sem data: complete abaixo.` : `${novos.length} reserva(s) lida(s). Confira e salve.`);
   }
 
@@ -92,7 +107,10 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
     setItens((l) => l.map((x) => (x._id === id ? { ...x, [campo]: valor, ...(campo === "cidade" ? { lat: null, lng: null } : {}) } : x)));
   const tirar = (id) => setItens((l) => l.filter((x) => x._id !== id));
 
-  const prontos = itens.filter((x) => !x._repetido && x.nome?.trim() && x.data_inicio && (x.cidade?.trim() || x.endereco?.trim()));
+  // pronta = tem nome, data e local; ou foi anexada sem internet (será lida e completada depois)
+  const prontos = itens.filter((x) => !x._repetido && (
+    x._pendenteLeitura || (x.nome?.trim() && x.data_inicio && (x.cidade?.trim() || x.endereco?.trim()))
+  ));
 
   async function salvarTodos() {
     if (!prontos.length) return;
@@ -101,9 +119,9 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
     const falhas = [];
     for (const x of prontos) {
       try {
-        await base44.entities.Reserva.create({
+        const criada = await base44.entities.Reserva.create({
           tipo: x.tipo,
-          nome: x.nome.trim(),
+          nome: x.nome?.trim() || NOME_PROVISORIO,
           cidade: x.cidade,
           endereco: x.endereco,
           lat: x.lat ?? undefined,
@@ -121,6 +139,9 @@ export default function AnexarReservas({ tipoAtual, dias, cidades, reservas, onF
           detalhes: x.detalhes,
           comprovante_uri: x.comprovante_uri || undefined,
         });
+        if (x._pendenteLeitura && criada?.id) {
+          marcarParaLer(criada.id, { link: x.link, comprovante_uri: x.comprovante_uri, tipo: x.tipo });
+        }
         ok++;
       } catch {
         falhas.push(x._id);
@@ -224,6 +245,12 @@ function ItemLido({ item: x, dias, cidades, reservas, onMudar, onTirar }) {
         <button onClick={onTirar} className="text-muted-foreground hover:text-destructive shrink-0" aria-label="Tirar"><Trash2 className="w-4 h-4" /></button>
       </div>
       {x._erro && <p className="text-xs text-destructive">{x._erro}. Preencha à mão.</p>}
+      {x._pendenteLeitura && (
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground bg-secondary/60 rounded-lg px-2.5 py-2">
+          <WifiOff className="w-3.5 h-3.5 mt-px shrink-0" />
+          Sem internet agora. Pode salvar assim: quando a conexão voltar, o sistema lê {x.comprovante_uri ? "o comprovante" : "o link"} e completa o que estiver vazio. Se já souber a data e o local, preencha.
+        </p>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Campo label="Tipo" valor={x.tipo} onMudar={(v) => onMudar("tipo", v)} opcoes={TIPOS_RESERVA.map((t) => ({ value: t.id, label: t.curto }))} />
@@ -242,7 +269,7 @@ function ItemLido({ item: x, dias, cidades, reservas, onMudar, onTirar }) {
         <Campo label="Moeda" valor={x.moeda || "EUR"} onMudar={(v) => onMudar("moeda", v)} opcoes={[{ value: "EUR", label: "EUR (€)" }, { value: "BRL", label: "BRL (R$)" }]} />
       </div>
 
-      <Condicao cond={cond} />
+      {!x._pendenteLeitura && <Condicao cond={cond} />}
     </div>
   );
 }

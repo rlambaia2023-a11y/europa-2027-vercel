@@ -1,5 +1,6 @@
 import { sincronizarAgora } from "@/api/base44Client";
 import { estadoOffline } from "@/lib/offline";
+import { processarLeiturasPendentes } from "@/lib/leituraPendente";
 
 const DOIS_MINUTOS = 2 * 60 * 1000;
 let ultimaTentativa = 0;
@@ -9,6 +10,8 @@ async function sincronizar(queryClient) {
   ultimaTentativa = Date.now();
   const ok = await sincronizarAgora();
   if (ok) queryClient.invalidateQueries();
+  // reservas anexadas sem internet: lê os links/comprovantes agora e completa os dados
+  if (ok && (await processarLeiturasPendentes())) queryClient.invalidateQueries({ queryKey: ["reservas"] });
 }
 
 export function iniciarSincronizacao(queryClient) {

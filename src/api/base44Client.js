@@ -229,13 +229,23 @@ async function executarOp(op) {
     }
     return;
   }
-  const q = supabase.from(op.tabela);
-  const { error } = op.tipo === "create"
-    ? await q.upsert({ ...limpar(camposDe(op.tabela), op.dados), id: op.id })
-    : op.tipo === "update"
-      ? await q.update(limpar(camposDe(op.tabela), op.dados)).eq("id", op.id)
-      : await q.delete().eq("id", op.id);
-  if (error) throw erro(error);
+  if (op.tipo === "delete") {
+    const { error } = await supabase.from(op.tabela).delete().eq("id", op.id);
+    if (error) throw erro(error);
+    return;
+  }
+  // mesma proteção do modo online: coluna que o banco ainda não tem não trava a fila
+  let dados = limpar(camposDe(op.tabela), op.dados);
+  for (let i = 0; i < 8; i++) {
+    const q = supabase.from(op.tabela);
+    const { error } = op.tipo === "create"
+      ? await q.upsert({ ...dados, id: op.id })
+      : await q.update(dados).eq("id", op.id);
+    if (!error) return;
+    const coluna = error.code === "PGRST204" && /'([^']+)' column/.exec(error.message || "")?.[1];
+    if (!coluna || !(coluna in dados)) throw erro(error);
+    dados = semColuna(op.tabela, dados, coluna);
+  }
 }
 
 export const sincronizarAgora = () => sincronizar({ executar: executarOp, baixarTudo });

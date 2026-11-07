@@ -7,6 +7,7 @@ import {
 import { useReservas, useInvalidate, useDias, useCidades, doRoteiro } from "@/lib/useTrip";
 import AnexarReservas, { Condicao } from "@/components/reservas/AnexarReservas";
 import { conferirReserva, periodoTexto } from "@/lib/reservaCondicao";
+import { estaPendente } from "@/lib/leituraPendente";
 import { ESTADOS_RESERVA } from "@/lib/tripData";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
@@ -238,7 +239,11 @@ export default function Reservas() {
                 </div>
                 <EstadoBadge estado={r.estado} />
               </div>
-              {r.estado !== "cancelado" && (
+              {estaPendente(r.id) ? (
+                <p className="mt-2 text-xs text-muted-foreground bg-secondary/60 rounded-lg px-2 py-1.5">
+                  Anexada sem internet: data e local serão lidos quando a conexão voltar.
+                </p>
+              ) : r.estado !== "cancelado" && (
                 <div className="mt-2"><Condicao cond={conferirReserva(r, contexto)} compacto /></div>
               )}
               {podeEditar && <CompletarDataLocal reserva={r} onSalvo={() => invalidate([["reservas"]])} />}
