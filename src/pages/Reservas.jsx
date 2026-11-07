@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
-  Hotel as HotelIcon, Plane, Car, Plus, ExternalLink, Star, Trash2, X, ImagePlus, Loader2, Paperclip,
-  TrainFront, Ticket, FolderInput, CalendarDays, MapPin,
+  Hotel as HotelIcon, Plane, Car, Plus, ExternalLink, Star, Trash2, X, ImagePlus, Paperclip,
+  TrainFront, Ticket, FolderInput, CalendarDays, MapPin, Camera,
 } from "lucide-react";
 import { useReservas, useInvalidate, useDias, useCidades, doRoteiro } from "@/lib/useTrip";
 import { Condicao } from "@/components/reservas/AnexarReservas";
@@ -30,9 +30,9 @@ export default function Reservas() {
   const { podeEditar, podeAdministrar } = usePermissao();
   const [aba, setAba] = useState("hotel");
   const [adicionando, setAdicionando] = useState(false);
-  const [importando, setImportando] = useState(false);
   const [dadosImportados, setDadosImportados] = useState(null);
   const fileInputRef = useRef(null);
+  const cameraRef = useRef(null);
   const { data: todosDias } = useDias();
   const dias = doRoteiro(todosDias);
   const { data: cidades } = useCidades();
@@ -43,58 +43,6 @@ export default function Reservas() {
     .filter((r) => r.tipo === aba)
     .sort((a, b) => (a.data_inicio || "9999").localeCompare(b.data_inicio || "9999"));
   const pendentes = (reservas || []).filter((r) => r.estado !== "cancelado" && conferirReserva(r, contexto).nivel !== "ok").length;
-
-  async function comprimirImagem(file, maxDim = 1600) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > maxDim || height > maxDim) {
-            const scale = maxDim / Math.max(width, height);
-            width = Math.round(width * scale);
-            height = Math.round(height * scale);
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            if (!blob) return reject(new Error("Falha ao comprimir imagem"));
-            resolve(new File([blob], "print.jpg", { type: "image/jpeg" }));
-          }, "image/jpeg", 0.85);
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function handleImportPrint(file) {
-    if (!file) return;
-    setImportando(true);
-    try {
-      const compacto = file.type.startsWith("image/") ? await comprimirImagem(file).catch(() => file) : file;
-      const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: compacto });
-      const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
-      const roteiro = (dias || []).map((d) => ({ data: d.data, cidade: d.cidade }));
-      const res = await base44.functions.invoke("LerReserva", { file_url: signed_url, tipo: aba, roteiro });
-      const dados = res.data?.dados || res.dados || {};
-      if (dados.tipo && dados.tipo !== aba) setAba(dados.tipo);
-      setDadosImportados({ ...dados, comprovante_uri: file_uri });
-      setAdicionando(true);
-      toast.success("Dados extraídos do print! Revise e salve.");
-    } catch {
-      toast.error("Erro ao importar print");
-    } finally {
-      setImportando(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
 
   async function mudarEstado(id, estado) {
     try {
@@ -157,17 +105,30 @@ export default function Reservas() {
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept={ACEITA_ANEXO}
           className="hidden"
-          onChange={(e) => handleImportPrint(e.target.files?.[0])}
+          onChange={(e) => { const l = Array.from(e.target.files || []); e.target.value = ""; if (l.length) abrirAnexo(l); }}
+        />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => { const l = Array.from(e.target.files || []); e.target.value = ""; if (l.length) abrirAnexo(l); }}
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          disabled={importando}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10"
         >
-          {importando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
-          {importando ? "Lendo…" : "Importar print/PDF"}
+          <ImagePlus className="w-4 h-4" /> Importar PDF/foto
+        </button>
+        <button
+          onClick={() => cameraRef.current?.click()}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-accent text-accent text-sm font-medium hover:bg-accent/10"
+        >
+          <Camera className="w-4 h-4" /> Tirar foto
         </button>
         <button
           onClick={() => { setAdicionando((v) => !v); setDadosImportados(null); }}
@@ -259,7 +220,7 @@ export default function Reservas() {
                 <p className="text-xs text-foreground/70 mt-2 leading-relaxed bg-secondary/50 rounded-lg p-2.5">{r.detalhes}</p>
               )}
 
-              {r.comprovante_uri && (
+              {r.comprovante_uri && !(r.anexos || []).includes(r.comprovante_uri) && (
                 <button
                   onClick={async () => {
                     try {

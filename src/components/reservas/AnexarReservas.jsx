@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Link2, Paperclip, Loader2, X, Check, AlertTriangle, CalendarDays, Trash2, Save, WifiOff } from "lucide-react";
+import { Link2, Paperclip, Loader2, X, Check, AlertTriangle, CalendarDays, Trash2, Save, WifiOff, Camera, FileText } from "lucide-react";
 import { marcarParaLer, NOME_PROVISORIO } from "@/lib/leituraPendente";
 import { base44 } from "@/api/base44Client";
 import { toast } from "react-hot-toast";
@@ -11,14 +11,16 @@ import { TIPOS_RESERVA, conferirReserva } from "@/lib/reservaCondicao";
 // Painel para anexar de uma vez as reservas que já foram feitas:
 // cole quantos links quiser (Airbnb, Booking, voos, passeios, trens…) e/ou envie prints e PDFs.
 // O sistema lê cada uma, pega data e local e confere com o roteiro antes de salvar.
-export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas, onFechar, onSalvo }) {
+export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas, onFechar, onSalvo, arquivosIniciais }) {
   const [textoLinks, setTextoLinks] = useState("");
-  const [arquivos, setArquivos] = useState([]);
+  const [arquivosEscolhidos, setArquivos] = useState([]);
   const [lendo, setLendo] = useState(false);
   const [progresso, setProgresso] = useState("");
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const inputRef = useRef(null);
+  const cameraRef = useRef(null);
+  const juntarArquivos = (lista) => setArquivos((a) => [...a, ...Array.from(lista || [])]);
 
   const roteiro = (dias || []).map((d) => ({ data: d.data, cidade: d.cidade }));
   const linksExistentes = new Set((reservas || []).map((r) => r.link).filter(Boolean));
@@ -39,8 +41,18 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
     ...base, ...extra, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _pendenteLeitura: true,
   });
 
-  async function lerTudo() {
-    const links = extrairLinks(textoLinks);
+  // aberto com arquivos já escolhidos (botões "Importar PDF/foto" e "Tirar foto"): lê na hora
+  const jaLeu = useRef(false);
+  useEffect(() => {
+    if (jaLeu.current || !arquivosIniciais?.length) return;
+    jaLeu.current = true;
+    lerTudo(arquivosIniciais);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arquivosIniciais]);
+
+  async function lerTudo(arquivosAgora) {
+    const arquivos = Array.isArray(arquivosAgora) ? arquivosAgora : arquivosEscolhidos;
+    const links = Array.isArray(arquivosAgora) ? [] : extrairLinks(textoLinks);
     if (!links.length && !arquivos.length) {
       toast.error("Cole pelo menos um link ou escolha um arquivo.");
       return;
@@ -61,7 +73,7 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
       if (!navigator.onLine) { novos.push(provisorio(base)); continue; }
       try {
         const res = await base44.functions.invoke("LerReserva", { link, tipo: tipoAtual, roteiro });
-        novos.push({ ...base, ...(res.data?.dados || {}), _titulo: res.data?.pagina?.titulo });
+        itensDe(res).forEach((d, k) => novos.push({ ...base, _id: k ? crypto.randomUUID() : base._id, ...d, _titulo: res.data?.pagina?.titulo }));
       } catch (e) {
         if (semRede(e)) novos.push(provisorio(base));
         else novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _erro: e?.message || "Não consegui ler" });
@@ -75,14 +87,16 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
       try {
         const pronto = await prepararArquivo(file);
         const { file_uri } = await base44.integrations.Core.UploadPrivateFile({ file: pronto });
-        if (!navigator.onLine) { novos.push(provisorio(base, { comprovante_uri: file_uri })); continue; }
+        const anexo = { comprovante_uri: file_uri, anexos: [file_uri] };
+        if (!navigator.onLine) { novos.push(provisorio(base, anexo)); continue; }
         const { signed_url } = await base44.integrations.Core.CreateFileSignedUrl({ file_uri });
         try {
           const res = await base44.functions.invoke("LerReserva", { file_url: signed_url, tipo: tipoAtual, roteiro });
-          novos.push({ ...base, ...(res.data?.dados || {}), comprovante_uri: file_uri });
+          // um PDF pode ter várias reservas (ida e volta, hotel + carro): cada uma vira um item com o arquivo anexado
+          itensDe(res).forEach((d, k) => novos.push({ ...base, _id: k ? crypto.randomUUID() : base._id, ...d, ...anexo }));
         } catch (e) {
-          if (semRede(e)) novos.push(provisorio(base, { comprovante_uri: file_uri }));
-          else novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", comprovante_uri: file_uri, _erro: e?.message || "Não consegui ler" });
+          if (semRede(e)) novos.push(provisorio(base, anexo));
+          else novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", ...anexo, _erro: e?.message || "Não consegui ler" });
         }
       } catch {
         novos.push({ ...base, tipo: tipoAtual || "hotel", nome: "", cidade: "", estado: "reservado", _erro: "Falha ao enviar o arquivo" });
@@ -90,8 +104,7 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
     }
 
     setItens((atual) => [...atual, ...novos]);
-    setTextoLinks("");
-    setArquivos([]);
+    if (!Array.isArray(arquivosAgora)) { setTextoLinks(""); setArquivos([]); }
     if (inputRef.current) inputRef.current.value = "";
     setLendo(false);
     setProgresso("");
@@ -138,6 +151,7 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
           cancelamento: x.cancelamento,
           detalhes: x.detalhes,
           comprovante_uri: x.comprovante_uri || undefined,
+          anexos: x.anexos?.length ? x.anexos : undefined,
         });
         if (x._pendenteLeitura && criada?.id) {
           marcarParaLer(criada.id, { link: x.link, comprovante_uri: x.comprovante_uri, tipo: x.tipo });
@@ -162,7 +176,7 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
         <div>
           <h2 className="font-heading text-lg font-semibold text-primary">Anexar reservas já feitas</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Hotel, Airbnb, apartamento, voo, trem, ônibus, barco, aluguel de carro, parques, passeios e ingressos. Cole os links (um por linha) e/ou envie prints, fotos e PDFs das confirmações. O tipo é reconhecido sozinho.
+            Hotel, Airbnb, apartamento, voo, trem, ônibus, barco, aluguel de carro, parques, passeios e ingressos. Cole os links (um por linha), envie o PDF da confirmação ou tire uma foto da reserva. O sistema lê, organiza os dados e anexa o arquivo. O tipo é reconhecido sozinho.
             Cada reserva só é salva com <strong>data e local</strong>, e o sistema confere com o roteiro.
           </p>
         </div>
@@ -190,18 +204,42 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
           multiple
           accept="image/*,application/pdf"
           className="hidden"
-          onChange={(e) => setArquivos(Array.from(e.target.files || []))}
+          onChange={(e) => { juntarArquivos(e.target.files); e.target.value = ""; }}
+        />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => { juntarArquivos(e.target.files); e.target.value = ""; }}
         />
         <button onClick={() => inputRef.current?.click()} disabled={lendo}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm font-medium hover:border-accent hover:text-accent disabled:opacity-50">
-          <Paperclip className="w-4 h-4" /> Prints / PDFs{arquivos.length ? ` (${arquivos.length})` : ""}
+          <Paperclip className="w-4 h-4" /> PDF, fotos e prints
         </button>
-        <button onClick={lerTudo} disabled={lendo}
+        <button onClick={() => cameraRef.current?.click()} disabled={lendo}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm font-medium hover:border-accent hover:text-accent disabled:opacity-50">
+          <Camera className="w-4 h-4" /> Tirar foto
+        </button>
+        <button onClick={() => lerTudo()} disabled={lendo}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50">
           {lendo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {lendo ? progresso || "Lendo…" : "Ler reservas"}
         </button>
       </div>
+
+      {arquivosEscolhidos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {arquivosEscolhidos.map((f, i) => (
+            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-[11px]">
+              {f.type === "application/pdf" ? <FileText className="w-3 h-3" /> : <Camera className="w-3 h-3" />}
+              <span className="max-w-[10rem] truncate">{f.name || "foto"}</span>
+              <button onClick={() => setArquivos((l) => l.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive" aria-label="Tirar"><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {itens.length > 0 && (
         <div className="space-y-3">
@@ -224,6 +262,13 @@ export default function AnexarReservas({ tipoAtual = "", dias, cidades, reservas
       )}
     </motion.div>
   );
+}
+
+// a função devolve "itens" (vários) ou só "dados" (um)
+function itensDe(res) {
+  const itens = res?.data?.itens;
+  if (Array.isArray(itens) && itens.length) return itens;
+  return [res?.data?.dados || {}];
 }
 
 function ItemLido({ item: x, dias, cidades, reservas, onMudar, onTirar }) {
@@ -268,6 +313,16 @@ function ItemLido({ item: x, dias, cidades, reservas, onMudar, onTirar }) {
         <Campo label="Preço" tipo="number" valor={x.preco ?? ""} onMudar={(v) => onMudar("preco", v)} />
         <Campo label="Moeda" valor={x.moeda || "EUR"} onMudar={(v) => onMudar("moeda", v)} opcoes={[{ value: "EUR", label: "EUR (€)" }, { value: "BRL", label: "BRL (R$)" }]} />
       </div>
+      {(x.detalhes || !x._pendenteLeitura) && (
+        <label className="block">
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Detalhes</span>
+          <textarea value={x.detalhes || ""} onChange={(e) => onMudar("detalhes", e.target.value)} rows={Math.min(7, Math.max(2, String(x.detalhes || "").split("\n").length))}
+            className="mt-0.5 w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ring" />
+        </label>
+      )}
+      {x.anexos?.length > 0 && (
+        <p className="inline-flex items-center gap-1.5 text-xs text-accent"><Paperclip className="w-3.5 h-3.5" /> Arquivo original será anexado à reserva</p>
+      )}
 
       {!x._pendenteLeitura && <Condicao cond={cond} />}
     </div>

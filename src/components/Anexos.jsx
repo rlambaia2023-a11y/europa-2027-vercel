@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Paperclip, FileText, Image as ImageIcon, Loader2, X } from "lucide-react";
+import { Paperclip, FileText, Image as ImageIcon, Loader2, X, Camera } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { comprimirImagem } from "@/lib/imagem";
 import { toast } from "react-hot-toast";
@@ -49,6 +49,7 @@ export async function abrirAnexo(uri) {
 export default function Anexos({ uris = [], onSalvar, podeEditar = false, rotulo = "Anexar foto, print ou PDF", className }) {
   const lista = Array.isArray(uris) ? uris.filter(Boolean) : [];
   const inputRef = useRef(null);
+  const cameraRef = useRef(null);
   const [enviando, setEnviando] = useState(false);
 
   async function adicionar(files) {
@@ -65,6 +66,7 @@ export default function Anexos({ uris = [], onSalvar, podeEditar = false, rotulo
     } finally {
       setEnviando(false);
       if (inputRef.current) inputRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
     }
   }
 
@@ -107,6 +109,13 @@ export default function Anexos({ uris = [], onSalvar, podeEditar = false, rotulo
             className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:border-accent hover:text-accent disabled:opacity-50">
             {enviando ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
             {enviando ? "Enviando…" : lista.length ? "Mais" : rotulo}
+          </button>
+          {/* abre a câmera do celular direto (no computador, abre a escolha de arquivo) */}
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => adicionar(e.target.files)} />
+          <button type="button" onClick={() => cameraRef.current?.click()} disabled={enviando}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-1 text-[11px] text-muted-foreground hover:border-accent hover:text-accent disabled:opacity-50"
+            aria-label="Tirar foto e anexar">
+            <Camera className="w-3 h-3" /> Foto
           </button>
         </>
       )}

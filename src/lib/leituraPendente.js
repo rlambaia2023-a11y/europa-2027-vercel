@@ -54,12 +54,29 @@ export async function processarLeiturasPendentes() {
         } else { remover(item.id); continue; }
 
         const res = await base44.functions.invoke("LerReserva", corpo);
-        const dados = res.data?.dados || {};
+        const itens = Array.isArray(res.data?.itens) && res.data.itens.length ? res.data.itens : [res.data?.dados || {}];
+        const dados = itens[0] || {};
         const patch = {};
         for (const c of CAMPOS) if (vazio(reserva[c]) && !vazio(dados[c])) patch[c] = dados[c];
         if ((vazio(reserva.nome) || reserva.nome === NOME_PROVISORIO) && !vazio(dados.nome)) patch.nome = dados.nome;
         if (Object.keys(patch).length) {
           await base44.entities.Reserva.update(item.id, patch);
+          mudou = true;
+        }
+        // o mesmo arquivo trazia mais reservas (ida e volta, hotel + carro): cria as demais
+        for (const extra of itens.slice(1)) {
+          await base44.entities.Reserva.create({
+            ...extra,
+            nome: extra.nome || NOME_PROVISORIO,
+            link: extra.link || undefined,
+            preco: extra.preco ?? undefined,
+            lat: extra.lat ?? undefined,
+            lng: extra.lng ?? undefined,
+            data_fim: extra.data_fim || undefined,
+            data_cotacao: new Date().toISOString().slice(0, 10),
+            comprovante_uri: item.comprovante_uri || undefined,
+            anexos: item.comprovante_uri ? [item.comprovante_uri] : undefined,
+          });
           mudou = true;
         }
         remover(item.id);

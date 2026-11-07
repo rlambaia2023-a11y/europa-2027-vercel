@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 
 // Qualquer tela pode abrir o painel de anexar: window.dispatchEvent(new Event(EVENTO_ANEXAR))
 export const EVENTO_ANEXAR = "europa:anexar-reserva";
-export const abrirAnexo = () => window.dispatchEvent(new Event(EVENTO_ANEXAR));
+// abrirAnexo() abre o painel vazio; abrirAnexo(arquivos) já abre lendo os arquivos (PDF/fotos)
+export const abrirAnexo = (arquivos) =>
+  window.dispatchEvent(new CustomEvent(EVENTO_ANEXAR, { detail: { arquivos: Array.isArray(arquivos) ? arquivos : null } }));
 
 // Botão flutuante presente em todo o sistema para anexar reservas já feitas:
 // hotel, Airbnb, apartamento, voo, trem, ônibus, barco, aluguel de carro, parques, passeios e ingressos.
@@ -17,13 +19,15 @@ export default function AnexarGlobal() {
   const { podeEditar } = usePermissao();
   const { pathname } = useLocation();
   const [aberto, setAberto] = useState(false);
+  const [arquivos, setArquivos] = useState(null);
 
   useEffect(() => {
-    const abrir = () => setAberto(true);
+    const abrir = (e) => { setArquivos(e?.detail?.arquivos || null); setAberto(true); };
     window.addEventListener(EVENTO_ANEXAR, abrir);
     return () => window.removeEventListener(EVENTO_ANEXAR, abrir);
   }, []);
   useEffect(() => { setAberto(false); }, [pathname]);
+  useEffect(() => { if (!aberto) setArquivos(null); }, [aberto]);
   useEffect(() => {
     if (!aberto) return;
     const esc = (e) => e.key === "Escape" && setAberto(false);
@@ -36,7 +40,7 @@ export default function AnexarGlobal() {
   return (
     <>
       <button
-        onClick={() => setAberto(true)}
+        onClick={() => { setArquivos(null); setAberto(true); }}
         aria-label="Anexar reservas"
         className={cn(
           "fixed z-30 right-4 bottom-20 lg:bottom-6 lg:right-6",
@@ -57,7 +61,7 @@ export default function AnexarGlobal() {
           >
             <div className="min-h-full flex items-start justify-center p-3 sm:p-6" onClick={(e) => e.target === e.currentTarget && setAberto(false)}>
               <div className="w-full max-w-3xl">
-                <PainelComDados onFechar={() => setAberto(false)} />
+                <PainelComDados arquivos={arquivos} onFechar={() => setAberto(false)} />
               </div>
             </div>
           </motion.div>
@@ -67,7 +71,7 @@ export default function AnexarGlobal() {
   );
 }
 
-function PainelComDados({ onFechar }) {
+function PainelComDados({ onFechar, arquivos }) {
   const { data: todosDias } = useDias();
   const { data: cidades } = useCidades();
   const { data: reservas } = useReservas();
@@ -78,6 +82,7 @@ function PainelComDados({ onFechar }) {
       cidades={cidades}
       reservas={reservas}
       onFechar={onFechar}
+      arquivosIniciais={arquivos}
       onSalvo={() => invalidate([["reservas"]])}
     />
   );
